@@ -1,6 +1,8 @@
-const { auth } = require('../config/firebase');
+const jwt = require('jsonwebtoken');
 
-async function verifyToken(req, res, next) {
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+
+function verifyToken(req, res, next) {
   const token = req.headers.authorization?.split('Bearer ')[1];
   
   if (!token) {
@@ -8,10 +10,13 @@ async function verifyToken(req, res, next) {
   }
 
   try {
-    const decodedToken = await auth.verifyIdToken(token);
-    req.user = decodedToken;
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = { uid: decoded.uid, email: decoded.email };
     next();
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ error: 'Token expired', code: 'TOKEN_EXPIRED' });
+    }
     return res.status(401).json({ error: 'Invalid token' });
   }
 }

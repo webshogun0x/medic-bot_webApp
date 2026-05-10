@@ -1,65 +1,77 @@
 # MediBot Backend API
 
-Node.js backend for MediBot Health Monitoring System.
+Node.js + Express API for the MediBot health monitoring system.
 
-## Setup Instructions
+## Setup
 
-### 1. Install Dependencies
 ```bash
 npm install
-```
-
-### 2. Configure Environment Variables
-Copy `.env.example` to `.env` and fill in your credentials:
-
-```bash
-cp .env.example .env
-```
-
-**Firebase Setup:**
-1. Go to Firebase Console → Project Settings → Service Accounts
-2. Click "Generate New Private Key"
-3. Copy the values to your `.env` file
-
-**OpenAI Setup:**
-1. Go to https://platform.openai.com/api-keys
-2. Create new API key
-3. Add to `.env` as `OPENAI_API_KEY`
-
-### 3. Run Server
-```bash
-# Development mode (auto-restart)
 npm run dev
-
-# Production mode
-npm start
 ```
 
-Server runs on `http://localhost:3000`
+Runs on `http://localhost:3000`
+
+## Environment Variables
+
+Create `.env` file:
+```
+FIREBASE_PROJECT_ID=medic-bot-health-monitor
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY=...
+FIREBASE_DATABASE_URL=...
+GROQ_API_KEY=your-groq-api-key
+PORT=3000
+NODE_ENV=development
+```
+
+## Project Structure
+
+```
+src/
+├── config/
+│   └── firebase.js           # Firebase initialization
+├── middleware/
+│   └── auth.middleware.js    # JWT verification
+├── routes/
+│   ├── auth.js              # Authentication endpoints
+│   ├── users.js             # User profile endpoints
+│   ├── readings.js          # Health readings endpoints
+│   └── ai-recommendations.js # AI endpoints
+├── services/
+│   └── ai.service.js        # Groq AI integration
+└── server.js                # Express server
+```
 
 ## API Endpoints
 
 ### Authentication
 - `POST /api/auth/register` - Register new user
-- `POST /api/auth/link-rfid` - Link RFID to user account
+- `POST /api/auth/link-rfid` - Link RFID to user
 
-### User Profile
+### Users
 - `GET /api/users/profile` - Get user profile
 - `PUT /api/users/profile` - Update profile
-- `GET /api/users/medications` - Get medication reminders
-- `POST /api/users/medications` - Add medication reminder
+- `GET /api/users/medications` - Get medications
+- `POST /api/users/medications` - Add medication
 
-### Health Readings
-- `GET /api/readings/latest` - Get latest reading
+### Readings
+- `GET /api/readings/latest` - Get latest health reading
 - `GET /api/readings/history?days=7` - Get reading history
 - `GET /api/readings/analytics?days=30` - Get analytics
 
 ### AI Recommendations
-- `POST /api/ai/generate` - Generate AI recommendations
+- `POST /api/ai/generate` - Generate health recommendations
 - `GET /api/ai/history` - Get recommendation history
 
-## Authentication
-All endpoints except `/api/auth/*` require Bearer token in header:
-```
-Authorization: Bearer <firebase-id-token>
+## Technologies
+
+- Express.js
+- Firebase (Auth & Realtime DB)
+- Groq AI API
+- Node.js
+
+## Development
+
+```bash
+npm run dev  # Runs with nodemon for auto-reload
 ```

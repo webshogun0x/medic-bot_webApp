@@ -1,6 +1,6 @@
-# MediBot Health Monitoring System - Mobile & Backend
+# MediBot Health Monitoring System
 
-Complete mobile application and backend API for the MediBot Health Monitoring System.
+A comprehensive health monitoring system with ESP32 hardware integration, Node.js backend, and React web dashboard.
 
 ## Project Structure
 
@@ -9,228 +9,118 @@ medibot-mobile-system/
 ├── backend/              # Node.js Express API
 │   ├── src/
 │   │   ├── config/      # Firebase configuration
+│   │   ├── middleware/  # Authentication middleware
 │   │   ├── routes/      # API endpoints
 │   │   ├── services/    # Business logic (AI, etc.)
-│   │   ├── middleware/  # Authentication
-│   │   └── server.js    # Main server
+│   │   └── server.js    # Express server
+│   ├── .env             # Environment variables
 │   └── package.json
 │
-└── mobile-app/          # React Native Expo App
+└── web-dashboard/       # React + Tailwind web app
     ├── src/
-    │   ├── screens/     # App screens
-    │   ├── components/  # Reusable components
-    │   ├── services/    # API calls
-    │   ├── context/     # State management
-    │   ├── navigation/  # Navigation setup
-    │   └── config/      # Firebase config
-    └── App.js
+    │   ├── services/    # API client
+    │   ├── Dashboard.tsx # Main dashboard component
+    │   └── App.tsx
+    ├── .env             # Environment variables
+    └── package.json
 ```
 
-## Quick Start Guide
+## Quick Start
 
-### Prerequisites
-- Node.js v18+ installed
-- Firebase project created
-- OpenAI API key (for AI recommendations)
-- Expo CLI installed: `npm install -g expo-cli`
-
-### Step 1: Setup Backend
+### Backend Setup
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
-# Edit .env with your credentials
 npm run dev
 ```
 
 Backend runs on `http://localhost:3000`
 
-### Step 2: Setup Mobile App
+### Web Dashboard Setup
 
 ```bash
-cd mobile-app
+cd web-dashboard
 npm install
-# Edit src/config/firebase.js with Firebase credentials
-# Edit src/services/api.service.js with backend URL
 npm start
 ```
 
-Scan QR code with Expo Go app on your phone.
+Web app runs on `http://localhost:3001`
 
-## System Architecture
+## Environment Variables
 
-### Data Flow
+### Backend (.env)
 ```
-[ESP32 Device] → [Firebase Realtime DB] ← [Backend API] ← [Mobile App]
-                                              ↓
-                                        [OpenAI API]
+FIREBASE_PROJECT_ID=medic-bot-health-monitor
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY=...
+FIREBASE_DATABASE_URL=...
+GROQ_API_KEY=your-groq-api-key
+PORT=3000
+NODE_ENV=development
 ```
 
-### User Journey
-
-1. **Registration (Mobile App)**
-   - User creates account with email/password
-   - Enters personal details and medical history
-   - Manually enters RFID number (written on card)
-   - RFID linked to user account in Firebase
-
-2. **Health Check (Physical Device)**
-   - User scans RFID at ESP32 station
-   - Fingerprint verification
-   - Health sensors collect data (SpO2, HR, BP, temp)
-   - Data saved to Firebase
-
-3. **View Data (Mobile App)**
-   - Dashboard shows latest readings
-   - Color-coded health status
-   - Historical trends and charts
-   - Analytics over 7/30/90 days
-
-4. **AI Recommendations (Mobile App)**
-   - User requests AI analysis
-   - Backend fetches health history
-   - OpenAI generates personalized advice
-   - Risk assessment and recommendations displayed
-
-5. **Medication Reminders (Mobile App)**
-   - Add medication schedules
-   - Set reminders with notifications
-
-## Firebase Database Structure
-
+### Web Dashboard (.env)
 ```
-USERS/
-  {userId}/
-    profile/
-      - email, firstName, lastName, dateOfBirth, gender
-      - rfidNumber, medicalId, emergencyContact
-      - bloodType, allergies, medications, medicalHistory
-    medications/
-      {medicationId}/
-        - name, dosage, frequency, time, active
-    recommendations/
-      {timestamp}/
-        - riskLevel, insights, recommendations, medicalAdvice
-
-RFID_MAPPING/
-  {rfidNumber}/
-    - userId
-
-READINGS/
-  {rfidNumber}/
-    latest/
-      - spo2, heartRate, systolic, diastolic, temperature, bmi, timestamp
-    history/
-      {timestamp}/
-        - spo2, heartRate, systolic, diastolic, temperature, bmi
+PORT=3001
+REACT_APP_API_URL=http://localhost:3000/api
 ```
 
 ## API Endpoints
 
 ### Authentication
 - `POST /api/auth/register` - Register new user
-- `POST /api/auth/link-rfid` - Link RFID to account
+- `POST /api/auth/link-rfid` - Link RFID to user
 
-### User Profile
+### Users
 - `GET /api/users/profile` - Get user profile
 - `PUT /api/users/profile` - Update profile
-- `GET /api/users/medications` - Get medication reminders
+- `GET /api/users/medications` - Get medications
 - `POST /api/users/medications` - Add medication
 
-### Health Readings
-- `GET /api/readings/latest` - Get latest reading
-- `GET /api/readings/history?days=7` - Get history
+### Readings
+- `GET /api/readings/latest` - Get latest health reading
+- `GET /api/readings/history?days=7` - Get reading history
 - `GET /api/readings/analytics?days=30` - Get analytics
 
 ### AI Recommendations
-- `POST /api/ai/generate` - Generate AI recommendations
+- `POST /api/ai/generate` - Generate health recommendations
 - `GET /api/ai/history` - Get recommendation history
-
-## Configuration
-
-### Backend Environment Variables (.env)
-```
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_CLIENT_EMAIL=your-service-account-email
-FIREBASE_PRIVATE_KEY=your-private-key
-FIREBASE_DATABASE_URL=https://your-project.firebaseio.com
-OPENAI_API_KEY=your-openai-api-key
-PORT=3000
-```
-
-### Mobile App Configuration
-- `src/config/firebase.js` - Firebase credentials
-- `src/services/api.service.js` - Backend API URL
 
 ## Features
 
-### Mobile App
-✅ User registration with RFID linking
-✅ Real-time health dashboard
-✅ Interactive charts and analytics
-✅ AI-powered health recommendations
+✅ Real-time health monitoring
+✅ AI-powered health recommendations (Groq)
+✅ Firebase real-time database
+✅ Responsive web dashboard
+✅ Health analytics and trends
 ✅ Medication reminders
-✅ Offline data caching
-✅ Pull-to-refresh data sync
+✅ User authentication
 
-### Backend API
-✅ Firebase Authentication
-✅ RESTful API endpoints
-✅ OpenAI integration for AI recommendations
-✅ Health data analytics
-✅ Secure token-based authentication
+## Tech Stack
 
-## Development Tips
+**Backend:**
+- Node.js + Express
+- Firebase (Auth & Realtime DB)
+- Groq AI API
 
-### Testing Locally
-1. Start backend: `cd backend && npm run dev`
-2. Get your computer's IP: `ipconfig` (Windows) or `ifconfig` (Mac/Linux)
-3. Update mobile app API_URL to `http://YOUR_IP:3000/api`
-4. Start mobile app: `cd mobile-app && npm start`
-5. Scan QR code with Expo Go
+**Frontend:**
+- React + TypeScript
+- Tailwind CSS
+- Recharts (data visualization)
+- Lucide React (icons)
+- Axios (HTTP client)
 
-### Debugging
-- Backend logs: Check terminal running `npm run dev`
-- Mobile logs: Shake device → "Debug Remote JS"
-- Firebase data: Firebase Console → Realtime Database
+## Development
 
-## Deployment
+Both services run in development mode with hot reload:
 
-### Backend (Example: Heroku)
 ```bash
-cd backend
-heroku create medibot-backend
-heroku config:set FIREBASE_PROJECT_ID=xxx OPENAI_API_KEY=xxx
-git push heroku main
+# Terminal 1 - Backend
+cd backend && npm run dev
+
+# Terminal 2 - Web Dashboard
+cd web-dashboard && npm start
 ```
 
-### Mobile App
-```bash
-cd mobile-app
-expo build:android  # For Android APK
-expo build:ios      # For iOS (requires Apple Developer account)
-```
-
-## Next Steps
-
-1. ✅ Complete Firebase setup
-2. ✅ Get OpenAI API key
-3. ✅ Test backend endpoints
-4. ✅ Configure mobile app
-5. ✅ Test on physical device
-6. 🔄 Add push notifications
-7. 🔄 Implement data export (PDF/CSV)
-8. 🔄 Add family account support
-
-## Support
-
-For issues or questions:
-1. Check README files in backend/ and mobile-app/
-2. Verify Firebase and OpenAI configurations
-3. Ensure all dependencies installed
-4. Check network connectivity
-
-## License
-
-MIT License - MediBot Health Monitoring System
+Access the dashboard at `http://localhost:3001`
