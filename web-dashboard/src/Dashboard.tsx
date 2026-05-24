@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Heart, Thermometer, Droplets, TrendingUp, TrendingDown,
-  Users, AlertTriangle, Search, Bell, User, Activity
+  Users, AlertTriangle, Search, Bell, User, Activity, X, CheckCircle, Info,
+  Scale, Ruler, Download
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { dashboardAPI } from './services/api';
+import { 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Legend, ReferenceLine 
+} from 'recharts';
+import { dashboardAPI, readingsAPI } from './services/api';
 import { 
   mockHealthReading, mockChartData, mockPieData, mockRecentActivity, mockStats 
 } from './utils/mockData';
@@ -18,19 +22,52 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [latestReading, setLatestReading] = useState<any>(null);
   const [chartData, setChartData] = useState<any[]>([]);
+  const [historyData, setHistoryData] = useState<any[]>([]);
   const [stats, setStats] = useState<any[]>([]);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchDashboardData();
+    // In a real app, we'd use a WebSocket or Firebase listener here
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [notificationRef]);
+
+  const fetchNotifications = async () => {
+    try {
+      // Assuming endpoint exists or we fetch from USERS/uid/notifications
+      // For now we'll use a mocked list if backend isn't ready
+      const dummyNotifications = [
+        { id: 1, title: 'Critical Alert', message: 'Systolic BP high: 145 mmHg', time: '5m ago', type: 'critical' },
+        { id: 2, title: 'Health Update', message: 'SPO2 levels recovered to 98%', time: '1h ago', type: 'info' },
+        { id: 3, title: 'Goal Reached', message: 'Weight target for June achieved!', time: '2h ago', type: 'success' },
+      ];
+      setNotifications(dummyNotifications);
+    } catch (err) {
+      console.error('Error fetching notifications');
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
+      fetchNotifications();
 
       const dashboardResp = await dashboardAPI.getDashboardData();
       if (dashboardResp?.data) {
@@ -74,6 +111,29 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       } else {
         setChartData(mockChartData);
       }
+
+      // Fetch full history for reports tab
+      const historyResp = await readingsAPI.getHistory(30);
+      if (historyResp.data && Array.isArray(historyResp.data)) {
+        const processed = historyResp.data.map((reading: any) => {
+          const date = new Date(parseInt(reading.timestamp));
+          return {
+            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            fullDate: date.toLocaleString(),
+            spo2: reading.spo2 || 0,
+            heartRate: reading.heartRate || 0,
+            systolic: reading.systolic || 0,
+            diastolic: reading.diastolic || 0,
+            temperature: reading.temperature || 0,
+            weight: reading.weight || 0,
+            heightLaser: reading.heightLaser || 0,
+            heightSonar: reading.heightSonar || 0,
+            bmiLaser: reading.bmiLaser || 0,
+            bmiSonar: reading.bmiSonar || 0,
+          };
+        });
+        setHistoryData(processed);
+      }
     } catch (err: any) {
       console.error('Error fetching dashboard data:', err);
       setError(err.response?.data?.message || 'Unable to load dashboard data');
@@ -89,12 +149,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const pieData = mockPieData;
 
   const styles = {
-    header: { backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+    header: { backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' as const },
     title: { fontSize: '32px', fontWeight: 'bold', color: '#111827' },
     headerRight: { display: 'flex', alignItems: 'center', gap: '16px' },
     searchBox: { position: 'relative' as const, display: 'flex', alignItems: 'center' },
     searchInput: { paddingLeft: '40px', paddingRight: '16px', paddingTop: '8px', paddingBottom: '8px', width: '320px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px' },
-    avatar: { width: '40px', height: '40px', backgroundColor: '#2563eb', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+    avatar: { width: '40px', height: '40px', backgroundColor: '#2563eb', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
     tabs: { padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '32px' },
     tabBtn: (active: boolean) => ({
       padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '500',
@@ -106,7 +166,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     statCard: { backgroundColor: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
     chartsSection: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '32px' },
     chartCard: { backgroundColor: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
-    bottomSection: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }
+    bottomSection: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' },
+    notificationPanel: { 
+      position: 'absolute' as const, top: '80px', right: '80px', width: '360px', 
+      backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
+      border: '1px solid #e5e7eb', zIndex: 50, maxHeight: '480px', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const
+    },
+    thresholdLabel: { fontSize: '12px', fontWeight: '500', padding: '4px 8px', borderRadius: '6px' }
   };
 
   const iconMap: any = {
@@ -120,6 +186,22 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     'New This Week': '#16a34a',
     'Critical Alerts': '#dc2626',
     'Health Score': '#9333ea'
+  };
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{ backgroundColor: '#fff', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+          <p style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1f2937' }}>{payload[0].payload.fullDate || label}</p>
+          {payload.map((item: any, index: number) => (
+            <p key={index} style={{ color: item.color, fontSize: '13px', margin: '4px 0' }}>
+              {item.name}: <span style={{ fontWeight: '600' }}>{item.value}</span>
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -142,14 +224,54 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               style={styles.searchInput}
             />
           </div>
-          <button 
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px' }}
-            onClick={fetchDashboardData}
-            title="Refresh dashboard"
-          >
-            <Bell size={24} color="#9ca3af" />
-          </button>
-          <div style={styles.avatar}>
+          <div style={{ position: 'relative' }}>
+            <button 
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', position: 'relative' }}
+              onClick={() => setShowNotifications(!showNotifications)}
+              title="Notifications"
+            >
+              <Bell size={24} color={notifications.length > 0 ? "#2563eb" : "#9ca3af"} />
+              {notifications.length > 0 && (
+                <span style={{ position: 'absolute', top: '4px', right: '4px', width: '10px', height: '10px', backgroundColor: '#dc2626', borderRadius: '50%', border: '2px solid #fff' }}></span>
+              )}
+            </button>
+            
+            {showNotifications && (
+              <div ref={notificationRef} style={styles.notificationPanel}>
+                <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f9fafb' }}>
+                  <span style={{ fontWeight: '700', color: '#1f2937' }}>Notifications</span>
+                  <button onClick={() => setShowNotifications(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={18} /></button>
+                </div>
+                <div style={{ overflowY: 'auto', flex: 1 }}>
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+                      <CheckCircle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                      <p>All caught up!</p>
+                    </div>
+                  ) : (
+                    notifications.map(n => (
+                      <div key={n.id} style={{ padding: '16px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer', transition: 'background 0.2s' }} onMouseOver={e=>e.currentTarget.style.backgroundColor='#f9fafb'} onMouseOut={e=>e.currentTarget.style.backgroundColor='#fff'}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
+                          <div style={{ marginTop: '2px' }}>
+                            {n.type === 'critical' ? <AlertTriangle size={18} color="#dc2626" /> : <Info size={18} color="#2563eb" />}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937' }}>{n.title}</div>
+                            <div style={{ fontSize: '13px', color: '#4b5563', marginTop: '2px' }}>{n.message}</div>
+                            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>{n.time}</div>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div style={{ padding: '12px', textAlign: 'center', borderTop: '1px solid #e5e7eb' }}>
+                  <button style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>View All Notifications</button>
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={styles.avatar} onClick={() => onNavigate('profile')}>
             <User size={24} color="#fff" />
           </div>
         </div>
@@ -241,18 +363,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>Health Trends</h3>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      {['1 Year', '6 Months', '3 Months', '1 Month'].map((period, index) => (
-                        <button
-                          key={period}
-                          style={{
-                            padding: '6px 12px', borderRadius: '8px', border: 'none', fontSize: '14px', fontWeight: '500',
-                            backgroundColor: index === 0 ? '#2563eb' : 'transparent', color: index === 0 ? '#fff' : '#4b5563',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {period}
-                        </button>
-                      ))}
+                      <button onClick={() => onNavigate('analytics')} style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px', fontWeight: '600', color: '#2563eb', cursor: 'pointer' }}>Detailed Analytics</button>
                     </div>
                   </div>
                   <ResponsiveContainer width="100%" height={300}>
@@ -279,8 +390,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     </PieChart>
                   </ResponsiveContainer>
                   <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                    <div style={{ fontSize: '14px', color: '#4b5563' }}>Total Patients</div>
-                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827' }}>640</div>
+                    <div style={{ fontSize: '14px', color: '#4b5563' }}>Current Condition</div>
+                    <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#16a34a' }}>Healthy</div>
                   </div>
                 </div>
               </div>
@@ -288,7 +399,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               <div style={styles.bottomSection}>
                 <div style={styles.chartCard}>
                   <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>Latest Health Reading</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
                     <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <Droplets size={16} color="#2563eb" />
@@ -306,16 +417,16 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <Activity size={16} color="#16a34a" />
-                        <span style={{ fontSize: '14px', color: '#4b5563' }}>Blood Pressure</span>
+                        <span style={{ fontSize: '14px', color: '#4b5563' }}>BP (Sys/Dia)</span>
                       </div>
                       <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>{latestReading.systolic}/{latestReading.diastolic}</div>
                     </div>
                     <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <Thermometer size={16} color="#ea580c" />
-                        <span style={{ fontSize: '14px', color: '#4b5563' }}>Temperature</span>
+                        <TrendingUp size={16} color="#9333ea" />
+                        <span style={{ fontSize: '14px', color: '#4b5563' }}>BMI (Laser)</span>
                       </div>
-                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>{latestReading.temperature}°C</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>{latestReading.bmiLaser || latestReading.bmi || 'N/A'}</div>
                     </div>
                   </div>
                 </div>
@@ -345,31 +456,111 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
           {/* HEALTH REPORTS TAB */}
           {activeTab === 'reports' && (
-            <div style={styles.chartCard}>
-              <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>Health Reports</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '20px' }}>
-                <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>Blood Pressure Analysis</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#6b7280" />
-                      <YAxis stroke="#6b7280" />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div style={{ ...styles.chartCard, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>Comprehensive Health Report</h2>
+                  <p style={{ color: '#6b7280' }}>Detailed overview of all medical sensing modules</p>
+                </div>
+                <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '700' }}>
+                  <Download size={20} /> Generate PDF Report
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '24px' }}>
+                {/* BMI COMPARISON */}
+                <div style={styles.chartCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>BMI Analysis (Laser vs Sonar)</h3>
+                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Ideal: 18.5 - 25</div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <ComposedChart data={historyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} />
+                      <YAxis tick={{fontSize: 11}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <ReferenceLine y={25} stroke="#f59e0b" strokeDasharray="3 3" />
+                      <ReferenceLine y={18.5} stroke="#3b82f6" strokeDasharray="3 3" />
+                      <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#2563eb" strokeWidth={3} dot={{r: 4}} />
+                      <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* BLOOD PRESSURE */}
+                <div style={styles.chartCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>Blood Pressure Trends</h3>
+                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#fee2e2', color: '#991b1b' }}>Ideal: 120/80</div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart data={historyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} />
+                      <YAxis tick={{fontSize: 11}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <ReferenceLine y={140} stroke="#ef4444" strokeDasharray="3 3" />
+                      <ReferenceLine y={90} stroke="#3b82f6" strokeDasharray="3 3" />
+                      <Line name="Systolic" type="monotone" dataKey="systolic" stroke="#dc2626" strokeWidth={2} />
+                      <Line name="Diastolic" type="monotone" dataKey="diastolic" stroke="#ef4444" strokeWidth={1} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-                <div style={{ padding: '16px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#111827', marginBottom: '12px' }}>Heart Rate Trends</h3>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <AreaChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#6b7280" />
-                      <YAxis stroke="#6b7280" />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="value" stroke="#16a34a" fill="#dcfce7" />
+
+                {/* SPO2 */}
+                <div style={styles.chartCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>Oxygen Saturation (SpO2)</h3>
+                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &gt; 95%</div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={historyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} />
+                      <YAxis domain={[90, 100]} tick={{fontSize: 11}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <ReferenceLine y={95} stroke="#ef4444" strokeWidth={2} />
+                      <Area name="SpO2 %" type="monotone" dataKey="spo2" stroke="#0891b2" fill="#ecfeff" strokeWidth={2} />
                     </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* HEIGHT */}
+                <div style={styles.chartCard}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>Height Sensing Comparison</h3>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>Meters (m)</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart data={historyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} />
+                      <YAxis domain={['dataMin - 0.05', 'dataMax + 0.05']} tick={{fontSize: 11}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Line name="Laser (m)" type="monotone" dataKey="heightLaser" stroke="#10b981" strokeWidth={3} />
+                      <Line name="Sonar (m)" type="monotone" dataKey="heightSonar" stroke="#6366f1" strokeWidth={2} strokeDasharray="3 3" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* WEIGHT & TEMP */}
+                <div style={styles.chartCard}>
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '20px' }}>Weight & Temperature Trends</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <LineChart data={historyData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} />
+                      <YAxis yAxisId="left" tick={{fontSize: 11}} />
+                      <YAxis yAxisId="right" orientation="right" tick={{fontSize: 11}} />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend />
+                      <Line yAxisId="left" name="Weight (kg)" type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={2} />
+                      <Line yAxisId="right" name="Temp (°C)" type="monotone" dataKey="temperature" stroke="#f59e0b" strokeWidth={2} />
+                    </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>

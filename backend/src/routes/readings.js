@@ -7,7 +7,11 @@ const router = express.Router();
 // Create or update a reading (POST endpoint to accept new readings)
 router.post('/record', verifyToken, async (req, res) => {
   try {
-    const { heartRate, spo2, systolic, diastolic, temperature } = req.body;
+    const { 
+      heartRate, spo2, systolic, diastolic, temperature, 
+      weight, heightSonar, heightLaser, bmiSonar, bmiLaser 
+    } = req.body;
+    
     const profile = await db.ref(`USERS/${req.user.uid}/profile`).once('value');
     const rfid = profile.val()?.rfidNumber;
     
@@ -16,20 +20,56 @@ router.post('/record', verifyToken, async (req, res) => {
     }
 
     const timestamp = Date.now();
-    const readingData = { heartRate, spo2, systolic, diastolic, temperature, timestamp };
+    const readingData = { 
+      heartRate, spo2, systolic, diastolic, temperature, 
+      weight, heightSonar, heightLaser, bmiSonar, bmiLaser,
+      timestamp 
+    };
 
     // Save to latest and history
     await db.ref(`READINGS/${rfid}/latest`).set(readingData);
     await db.ref(`READINGS/${rfid}/history/${timestamp}`).set(readingData);
 
+    // Check for thresholds and create notifications if needed
+    const alerts = [];
+    if (heartRate > 100 || heartRate < 60) alerts.push(`Heart Rate is abnormal: ${heartRate} bpm`);
+    if (spo2 < 95) alerts.push(`SpO2 level is low: ${spo2}%`);
+    if (systolic > 140 || systolic < 90) alerts.push(`Systolic BP is out of range: ${systolic}`);
+    if (diastolic > 90 || diastolic < 60) alerts.push(`Diastolic BP is out of range: ${diastolic}`);
+    if (temperature > 38) alerts.push(`High fever detected: ${temperature}°C`);
+    if (bmiLaser > 25 || bmiLaser < 18.5) alerts.push(`BMI is out of ideal range: ${bmiLaser}`);
+
+    if (alerts.length > 0) {
+      const alertData = {
+        title: 'Health Alert',
+        message: alerts.join('. '),
+        timestamp,
+        read: false,
+        severity: 'critical',
+        userId: req.user.uid,
+        rfid,
+        patientName: `${profile.val().firstName} ${profile.val().lastName}`
+      };
+
+      // Notify Patient
+      await db.ref(`USERS/${req.user.uid}/notifications`).push(alertData);
+      
+      // Notify All Admins
+      const adminsSnapshot = await db.ref('ADMINS').once('value');
+      const admins = adminsSnapshot.val() || {};
+      for (const adminId of Object.keys(admins)) {
+        await db.ref(`ADMINS/${adminId}/notifications`).push(alertData);
+      }
+    }
+
     // Auto-log activity
     await logActivity(req.user.uid, {
       type: 'reading_taken',
-      description: `New health reading recorded - HR: ${heartRate}, SpO2: ${spo2}%`,
+      description: `New health reading recorded - Weight: ${weight}kg, BMI: ${bmiLaser}`,
       value: readingData
     }).catch(err => console.log('Activity log error (non-critical):', err.message));
 
-    res.json({ success: true, timestamp });
+    res.json({ success: true, timestamp, alerts: alerts.length > 0 ? alerts : null });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

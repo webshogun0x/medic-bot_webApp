@@ -39,18 +39,24 @@ async function calculateStats(rfidNumber) {
         (r.heartRate && (r.heartRate > 100 || r.heartRate < 60)) ||
         (r.spo2 && r.spo2 < 95) ||
         (r.systolic && (r.systolic > 140 || r.systolic < 90)) ||
-        (r.temperature && (r.temperature > 38 || r.temperature < 36));
+        (r.diastolic && (r.diastolic > 90 || r.diastolic < 60)) ||
+        (r.temperature && (r.temperature > 38 || r.temperature < 35.5)) ||
+        (r.bmiLaser && (r.bmiLaser > 30 || r.bmiLaser < 17));
       return isCritical;
     }).length;
 
     // Health score calculation (0-100)
     let healthScore = 100;
-    readings.slice(-30).forEach(reading => {
-      if (reading.heartRate && (reading.heartRate > 100 || reading.heartRate < 60)) healthScore -= 5;
-      if (reading.spo2 && reading.spo2 < 95) healthScore -= 10;
-      if (reading.systolic && (reading.systolic > 140 || reading.systolic < 90)) healthScore -= 8;
-      if (reading.temperature && (reading.temperature > 38 || reading.temperature < 36)) healthScore -= 5;
-    });
+    const recentReadings = readings.slice(-10);
+    if (recentReadings.length > 0) {
+      recentReadings.forEach(reading => {
+        if (reading.heartRate && (reading.heartRate > 100 || reading.heartRate < 60)) healthScore -= 2;
+        if (reading.spo2 && reading.spo2 < 95) healthScore -= 5;
+        if (reading.systolic && (reading.systolic > 140 || reading.systolic < 90)) healthScore -= 3;
+        if (reading.temperature && (reading.temperature > 38 || reading.temperature < 36)) healthScore -= 2;
+        if (reading.bmiLaser && (reading.bmiLaser > 30 || reading.bmiLaser < 18.5)) healthScore -= 2;
+      });
+    }
     healthScore = Math.max(0, Math.min(100, healthScore));
 
     return {
