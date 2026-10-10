@@ -5,17 +5,22 @@ export const mockHealthReading = {
   systolic: 120,
   diastolic: 80,
   temperature: 36.5,
+  weight: 68.4,
+  heightLaser: 174.5,
+  heightSonar: 174.8,
+  bmiLaser: 22.4,
+  bmiSonar: 22.5,
   timestamp: Date.now()
 };
 
 export const mockChartData = [
-  { name: 'Jan', value: 400 },
-  { name: 'Feb', value: 300 },
-  { name: 'Mar', value: 600 },
-  { name: 'Apr', value: 800 },
-  { name: 'May', value: 500 },
-  { name: 'Jun', value: 700 },
-  { name: 'Jul', value: 900 }
+  { name: 'Mon', date: 'Mon', value: 22.2, bmiLaser: 22.2, bmiSonar: 22.4 },
+  { name: 'Tue', date: 'Tue', value: 22.4, bmiLaser: 22.4, bmiSonar: 22.5 },
+  { name: 'Wed', date: 'Wed', value: 22.1, bmiLaser: 22.1, bmiSonar: 22.3 },
+  { name: 'Thu', date: 'Thu', value: 22.5, bmiLaser: 22.5, bmiSonar: 22.6 },
+  { name: 'Fri', date: 'Fri', value: 22.3, bmiLaser: 22.3, bmiSonar: 22.4 },
+  { name: 'Sat', date: 'Sat', value: 22.6, bmiLaser: 22.6, bmiSonar: 22.5 },
+  { name: 'Sun', date: 'Sun', value: 22.4, bmiLaser: 22.4, bmiSonar: 22.5 }
 ];
 
 export const mockPieData = [

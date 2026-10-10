@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Mail, Lock, User, Phone, Smartphone, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Heart, Mail, Lock, User, Phone, Smartphone, ArrowLeft, ArrowRight, Calendar, CreditCard } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, database } from '../context/AuthContext';
 import { ref, set } from 'firebase/database';
@@ -16,6 +16,9 @@ const SignUpPage = ({ onSwitchToSignIn }: SignUpPageProps) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [medicalId, setMedicalId] = useState('');
+  const [dob, setDob] = useState('');
+  const [gender, setGender] = useState('Male');
   const [rfidNumber, setRfidNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +52,8 @@ const SignUpPage = ({ onSwitchToSignIn }: SignUpPageProps) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const userId = userCredential.user.uid;
 
+      const generatedMedId = medicalId.trim() || `MB-${Math.floor(10000 + Math.random() * 90000)}`;
+
       // Create user profile in database
       const userProfileRef = ref(database, `USERS/${userId}/profile`);
       await set(userProfileRef, {
@@ -56,7 +61,14 @@ const SignUpPage = ({ onSwitchToSignIn }: SignUpPageProps) => {
         lastName: lastName.trim(),
         email: email.trim(),
         phone: phone.trim() || '',
+        medicalId: generatedMedId,
+        medical_id: generatedMedId,
+        dob: dob || '',
+        gender: gender || 'Unspecified',
         rfidNumber: rfidNumber.trim() || '',
+        biometric_enrolled: false,
+        fingerprint_registered: false,
+        fingerprint_id: 0,
         bloodType: '',
         emergencyContact: '',
         allergies: '',
@@ -70,6 +82,26 @@ const SignUpPage = ({ onSwitchToSignIn }: SignUpPageProps) => {
         await set(rfidRef, {
           userId,
           linkedAt: new Date().toISOString()
+        });
+
+        // Direct Kiosk Lookup endpoint (USERS/<rfid>)
+        const rfidDirectRef = ref(database, `USERS/${rfidNumber.trim()}`);
+        await set(rfidDirectRef, {
+          userId,
+          name: `${firstName.trim()} ${lastName.trim()}`,
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: email.trim(),
+          phone: phone.trim() || '',
+          medical_id: generatedMedId,
+          medicalId: generatedMedId,
+          dob: dob || '',
+          gender: gender || 'Unspecified',
+          rfid: rfidNumber.trim(),
+          biometric_enrolled: false,
+          fingerprint_registered: false,
+          fingerprint_id: 0,
+          createdAt: new Date().toISOString()
         });
       }
 
@@ -439,25 +471,87 @@ const SignUpPage = ({ onSwitchToSignIn }: SignUpPageProps) => {
             </div>
           </div>
 
-          <div style={styles.inputGroup}>
-            <label style={styles.inputLabel}>RFID Device Number (Optional)</label>
-            <div style={styles.inputWrapper}>
-              <Smartphone size={18} style={styles.inputIcon} />
-              <input
-                type="text"
-                placeholder="RFID-XXXXXXXXXX"
-                value={rfidNumber}
-                onChange={(e) => setRfidNumber(e.target.value)}
-                style={styles.input}
-                onFocus={(e) => {
-                  (e.target as HTMLInputElement).style.borderColor = '#2563eb';
-                  (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
-                }}
-                onBlur={(e) => {
-                  (e.target as HTMLInputElement).style.borderColor = '#d1d5db';
-                  (e.target as HTMLInputElement).style.boxShadow = 'none';
-                }}
-              />
+          <div style={styles.nameRow}>
+            <div style={styles.inputGroup}>
+              <label style={styles.inputLabel}>Medical ID (Optional)</label>
+              <div style={styles.inputWrapper}>
+                <CreditCard size={18} style={styles.inputIcon} />
+                <input
+                  type="text"
+                  placeholder="MB-94021 (Auto-assigned if empty)"
+                  value={medicalId}
+                  onChange={(e) => setMedicalId(e.target.value)}
+                  style={styles.input}
+                  onFocus={(e) => {
+                    (e.target as HTMLInputElement).style.borderColor = '#2563eb';
+                    (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    (e.target as HTMLInputElement).style.borderColor = '#d1d5db';
+                    (e.target as HTMLInputElement).style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.inputLabel}>Date of Birth (Optional)</label>
+              <div style={styles.inputWrapper}>
+                <Calendar size={18} style={styles.inputIcon} />
+                <input
+                  type="date"
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                  style={styles.input}
+                  onFocus={(e) => {
+                    (e.target as HTMLInputElement).style.borderColor = '#2563eb';
+                    (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    (e.target as HTMLInputElement).style.borderColor = '#d1d5db';
+                    (e.target as HTMLInputElement).style.boxShadow = 'none';
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div style={styles.nameRow}>
+            <div style={styles.inputGroup}>
+              <label style={styles.inputLabel}>Gender</label>
+              <div style={styles.inputWrapper}>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  style={{ ...styles.input, paddingLeft: '14px', backgroundColor: '#fff', cursor: 'pointer' }}
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.inputLabel}>RFID Card (Optional)</label>
+              <div style={styles.inputWrapper}>
+                <Smartphone size={18} style={styles.inputIcon} />
+                <input
+                  type="text"
+                  placeholder="RFID-XXXXXXXXXX"
+                  value={rfidNumber}
+                  onChange={(e) => setRfidNumber(e.target.value)}
+                  style={styles.input}
+                  onFocus={(e) => {
+                    (e.target as HTMLInputElement).style.borderColor = '#2563eb';
+                    (e.target as HTMLInputElement).style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    (e.target as HTMLInputElement).style.borderColor = '#d1d5db';
+                    (e.target as HTMLInputElement).style.boxShadow = 'none';
+                  }}
+                />
+              </div>
             </div>
           </div>
 

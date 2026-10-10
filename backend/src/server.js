@@ -36,7 +36,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`MediBot Backend running on port ${PORT}`);
-});
+// Start server if executed directly
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  const server = app.listen(PORT, () => {
+    console.log(`MediBot Backend running on port ${PORT}`);
+  });
+}
+
+module.exports = app;

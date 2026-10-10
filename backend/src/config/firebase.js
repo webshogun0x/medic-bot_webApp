@@ -14,10 +14,12 @@ try {
     throw new Error('Missing Firebase credentials in .env file');
   }
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-    databaseURL: process.env.FIREBASE_DATABASE_URL
-  });
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      databaseURL: process.env.FIREBASE_DATABASE_URL
+    });
+  }
 
   initialized = true;
   console.log('✓ Firebase initialized successfully');

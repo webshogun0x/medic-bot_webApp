@@ -39,10 +39,10 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
             diastolic: reading.diastolic || 0,
             temperature: reading.temperature || 0,
             weight: reading.weight || 0,
-            heightLaser: reading.heightLaser || 0,
-            heightSonar: reading.heightSonar || 0,
-            bmiLaser: reading.bmiLaser || 0,
-            bmiSonar: reading.bmiSonar || 0,
+            heightLaser: reading.heightLaser || reading.height_laser || reading.height || 0,
+            heightSonar: reading.heightSonar || reading.height_sonar || 0,
+            bmiLaser: reading.bmiLaser || reading.bmi_laser || reading.bmi || 0,
+            bmiSonar: reading.bmiSonar || reading.bmi_sonar || 0,
           };
         });
         setHistoryData(processed);

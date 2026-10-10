@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { 
-  Heart, Thermometer, Droplets, TrendingUp, TrendingDown,
+  Heart, Droplets, TrendingUp, TrendingDown,
   Users, AlertTriangle, Search, Bell, User, Activity, X, CheckCircle, Info,
-  Scale, Ruler, Download
+  Download
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Legend, ReferenceLine 
 } from 'recharts';
 import { dashboardAPI, readingsAPI } from './services/api';
+import { AuthContext } from './context/AuthContext';
 import { 
   mockHealthReading, mockChartData, mockPieData, mockRecentActivity, mockStats 
 } from './utils/mockData';
@@ -18,6 +19,7 @@ interface DashboardProps {
 }
 
 const Dashboard = ({ onNavigate }: DashboardProps) => {
+  const { userProfile } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [latestReading, setLatestReading] = useState<any>(null);
@@ -121,15 +123,15 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
             fullDate: date.toLocaleString(),
             spo2: reading.spo2 || 0,
-            heartRate: reading.heartRate || 0,
+            heartRate: reading.heartRate || reading.heart_rate || 0,
             systolic: reading.systolic || 0,
             diastolic: reading.diastolic || 0,
             temperature: reading.temperature || 0,
             weight: reading.weight || 0,
-            heightLaser: reading.heightLaser || 0,
-            heightSonar: reading.heightSonar || 0,
-            bmiLaser: reading.bmiLaser || 0,
-            bmiSonar: reading.bmiSonar || 0,
+            heightLaser: reading.heightLaser || reading.height_laser || reading.height || 0,
+            heightSonar: reading.heightSonar || reading.height_sonar || 0,
+            bmiLaser: reading.bmiLaser || reading.bmi_laser || reading.bmi || 0,
+            bmiSonar: reading.bmiSonar || reading.bmi_sonar || 0,
           };
         });
         setHistoryData(processed);
@@ -276,6 +278,61 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
           </div>
         </div>
       </header>
+ 
+      {/* Biometric Registration Action Required Banner */}
+      {(!userProfile?.biometric_enrolled) && (
+        <div style={{
+          backgroundColor: '#fffbeb',
+          border: '1px solid #fde68a',
+          borderRadius: '10px',
+          padding: '16px 24px',
+          margin: '16px 32px 0 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: '0 2px 4px rgba(217, 119, 6, 0.08)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              backgroundColor: '#fef3c7',
+              borderRadius: '50%',
+              padding: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#d97706',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={24} />
+            </div>
+            <div>
+              <div style={{ fontWeight: '700', color: '#92400e', fontSize: '15px' }}>
+                Action Required: Complete Biometric Registration at Kiosk
+              </div>
+              <div style={{ color: '#b45309', fontSize: '13px', marginTop: '3px' }}>
+                Your web account is active, but your biometric fingerprint and clinic RFID badge are not yet enrolled. Visit any MediBot health kiosk to complete your 1-minute physical enrollment.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => onNavigate('profile')}
+            style={{
+              backgroundColor: '#d97706',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 18px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+              marginLeft: '20px'
+            }}
+          >
+            View Clinic Badge Info →
+          </button>
+        </div>
+      )}
 
       <div style={styles.tabs}>
         {[
@@ -361,18 +418,26 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               <div style={styles.chartsSection}>
                 <div style={styles.chartCard}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>Health Trends</h3>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => onNavigate('analytics')} style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px', fontWeight: '600', color: '#2563eb', cursor: 'pointer' }}>Detailed Analytics</button>
+                    <div>
+                      <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>BMI Trends (Laser vs Sonar)</h3>
+                      <p style={{ fontSize: '13px', color: '#6b7280', margin: '4px 0 0 0' }}>Dual-sensor precision tracking across recent readings</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e', fontSize: '12px', padding: '4px 8px', borderRadius: '6px' }}>Ideal: 18.5 - 25</div>
+                      <button onClick={() => onNavigate('analytics')} style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px', fontWeight: '600', color: '#2563eb', cursor: 'pointer', backgroundColor: '#fff' }}>Detailed Analytics</button>
                     </div>
                   </div>
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={chartData}>
+                    <LineChart data={historyData.length > 0 ? historyData : chartData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                      <XAxis dataKey="name" stroke="#6b7280" />
-                      <YAxis stroke="#6b7280" />
+                      <XAxis dataKey={historyData.length > 0 ? "date" : "name"} stroke="#6b7280" />
+                      <YAxis stroke="#6b7280" domain={['auto', 'auto']} />
                       <Tooltip />
-                      <Line type="monotone" dataKey="value" stroke="#4F46E5" strokeWidth={3} dot={{ fill: '#4F46E5' }} />
+                      <Legend />
+                      <ReferenceLine y={25} stroke="#f59e0b" strokeDasharray="3 3" />
+                      <ReferenceLine y={18.5} stroke="#3b82f6" strokeDasharray="3 3" />
+                      <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -399,7 +464,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               <div style={styles.bottomSection}>
                 <div style={styles.chartCard}>
                   <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>Latest Health Reading</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
                     <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <Droplets size={16} color="#2563eb" />
@@ -423,10 +488,24 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     </div>
                     <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <TrendingUp size={16} color="#9333ea" />
+                        <TrendingUp size={16} color="#2563eb" />
                         <span style={{ fontSize: '14px', color: '#4b5563' }}>BMI (Laser)</span>
                       </div>
-                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>{latestReading.bmiLaser || latestReading.bmi || 'N/A'}</div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>{latestReading.bmiLaser || latestReading.bmi_laser || latestReading.bmi || 'N/A'}</div>
+                    </div>
+                    <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <TrendingUp size={16} color="#9333ea" />
+                        <span style={{ fontSize: '14px', color: '#4b5563' }}>BMI (Sonar)</span>
+                      </div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>{latestReading.bmiSonar || latestReading.bmi_sonar || 'N/A'}</div>
+                    </div>
+                    <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <User size={16} color="#059669" />
+                        <span style={{ fontSize: '14px', color: '#4b5563' }}>Weight</span>
+                      </div>
+                      <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>{latestReading.weight ? `${latestReading.weight} kg` : 'N/A'}</div>
                     </div>
                   </div>
                 </div>

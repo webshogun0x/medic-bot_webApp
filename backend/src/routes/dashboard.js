@@ -70,7 +70,15 @@ router.get('/chart-data', verifyToken, async (req, res) => {
       .map(([timestamp, data]) => ({
         timestamp: parseInt(timestamp),
         date: new Date(parseInt(timestamp)).toLocaleDateString('en-US', { weekday: 'short' }),
-        value: Math.round((data.heartRate || 0) + (data.spo2 || 0))
+        bmiLaser: data.bmiLaser || data.bmi_laser || data.bmi || 0,
+        bmiSonar: data.bmiSonar || data.bmi_sonar || 0,
+        heightLaser: data.heightLaser || data.height_laser || data.height || 0,
+        heightSonar: data.heightSonar || data.height_sonar || 0,
+        heartRate: data.heartRate || data.heart_rate || 0,
+        spo2: data.spo2 || 0,
+        temperature: data.temperature || 0,
+        weight: data.weight || 0,
+        value: data.bmiLaser || data.bmi_laser || data.bmi || 0
       }))
       .sort((a, b) => a.timestamp - b.timestamp)
       .slice(-7);
