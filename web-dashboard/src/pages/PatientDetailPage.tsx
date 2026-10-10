@@ -4,7 +4,9 @@ import {
   Calendar, Phone, Mail, CreditCard, Download, AlertTriangle,
   Scale, Ruler, ChevronRight, TrendingUp
 } from 'lucide-react';
-import { adminAPI, readingsAPI } from '../services/api';
+import { adminAPI } from '../services/api';
+import { database } from '../context/AuthContext';
+import { ref, get } from 'firebase/database';
 import { useParams } from 'react-router-dom';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
@@ -37,29 +39,39 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
       setLoading(true);
       setError(null);
       const response = await adminAPI.getPatientDetails(uid!);
-      setPatient(response.data);
+      const patientData = response.data;
+      setPatient(patientData);
       
-      // In real scenario, fetch full history
-      // For this implementation, I'll generate a realistic trend based on latest if history not attached
-      const mockHistory = Array.from({ length: 12 }).map((_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (12 - i));
-        return {
-          date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          timestamp: d.getTime(),
-          heartRate: 72 + Math.floor(Math.random() * 15),
-          spo2: 96 + Math.floor(Math.random() * 4),
-          systolic: 118 + Math.floor(Math.random() * 20),
-          diastolic: 78 + Math.floor(Math.random() * 10),
-          temperature: 36.5 + (Math.random() * 0.8),
-          weight: 72 + (Math.random() * 2),
-          bmiLaser: 23.5 + (Math.random() * 1.5),
-          bmiSonar: 23.4 + (Math.random() * 1.8),
-          heightLaser: 1.75,
-          heightSonar: 1.74 + (Math.random() * 0.02)
-        };
-      });
-      setHistoryData(mockHistory);
+      // Fetch real patient history from Firebase Realtime Database
+      const rfid = patientData?.rfidNumber || patientData?.rfid;
+      let realHistory: any[] = [];
+      if (rfid) {
+        const histSnap = await get(ref(database, `READINGS/${rfid}/history`));
+        if (histSnap.exists()) {
+          const histObj = histSnap.val();
+          realHistory = Object.entries(histObj).map(([key, rawItem]: [string, any]) => {
+            const item = rawItem || {};
+            const rawTs = parseInt(key) || parseInt(item.timestamp) || Date.now();
+            const ts = rawTs > 1e11 ? rawTs : rawTs * 1000;
+            const d = new Date(ts);
+            return {
+              date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              timestamp: ts,
+              heartRate: item.heartRate || item.heart_rate || 0,
+              spo2: item.spo2 || 0,
+              systolic: item.systolic || 0,
+              diastolic: item.diastolic || 0,
+              temperature: item.temperature || 0,
+              weight: item.weight || 0,
+              bmiLaser: item.bmiLaser || item.bmi_laser || item.bmi || 0,
+              bmiSonar: item.bmiSonar || item.bmi_sonar || 0,
+              heightLaser: item.heightLaser || item.height_laser || item.height || 0,
+              heightSonar: item.heightSonar || item.height_sonar || 0,
+            };
+          }).sort((a, b) => a.timestamp - b.timestamp);
+        }
+      }
+      setHistoryData(realHistory);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to load patient details');
     } finally {

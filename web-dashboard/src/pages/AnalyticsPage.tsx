@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { ArrowLeft, Download, Calendar, Activity, Info } from 'lucide-react';
+import { AuthContext, database } from '../context/AuthContext';
+import { ref, get } from 'firebase/database';
 import { readingsAPI } from '../services/api';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
@@ -11,6 +13,7 @@ interface AnalyticsPageProps {
 }
 
 const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
+  const { userProfile } = useContext(AuthContext);
   const [days, setDays] = useState(30);
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,13 +21,62 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
 
   useEffect(() => {
     fetchAnalytics();
-  }, [days]);
+  }, [days, userProfile]);
 
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
       setError(null);
+      const rfid = userProfile?.rfidNumber || userProfile?.rfid;
+      const cutoffTime = Date.now() - (days * 86400000);
 
+      // 1. Try Firebase Realtime Database directly
+      let historyObj: any = null;
+      if (rfid) {
+        const snap = await get(ref(database, `READINGS/${rfid}/history`));
+        if (snap.exists()) {
+          historyObj = snap.val();
+        }
+      }
+      if (!historyObj) {
+        const globalSnap = await get(ref(database, 'READINGS/history'));
+        if (globalSnap.exists()) {
+          historyObj = globalSnap.val();
+        }
+      }
+
+      if (historyObj && typeof historyObj === 'object') {
+        const processed = Object.entries(historyObj)
+          .map(([key, rawItem]: [string, any]) => {
+            const item = rawItem || {};
+            const rawTs = parseInt(key) || parseInt(item.timestamp) || Date.now();
+            const ts = rawTs > 1e11 ? rawTs : rawTs * 1000;
+            const date = new Date(ts);
+            return {
+              timestamp: ts,
+              date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+              time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              fullDate: date.toLocaleString(),
+              spo2: item.spo2 || 0,
+              heartRate: item.heartRate || item.heart_rate || 0,
+              systolic: item.systolic || 0,
+              diastolic: item.diastolic || 0,
+              temperature: item.temperature || 0,
+              weight: item.weight || 0,
+              heightLaser: item.heightLaser || item.height_laser || item.height || 0,
+              heightSonar: item.heightSonar || item.height_sonar || 0,
+              bmiLaser: item.bmiLaser || item.bmi_laser || item.bmi || 0,
+              bmiSonar: item.bmiSonar || item.bmi_sonar || 0,
+            };
+          })
+          .filter(reading => reading.timestamp >= cutoffTime)
+          .sort((a, b) => a.timestamp - b.timestamp);
+
+        setHistoryData(processed);
+        return;
+      }
+
+      // 2. Fallback to API if available
       const historyResp = await readingsAPI.getHistory(days);
       if (historyResp.data && Array.isArray(historyResp.data)) {
         const processed = historyResp.data.map((reading: any) => {
@@ -34,7 +86,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
             time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             fullDate: date.toLocaleString(),
             spo2: reading.spo2 || 0,
-            heartRate: reading.heartRate || 0,
+            heartRate: reading.heartRate || reading.heart_rate || 0,
             systolic: reading.systolic || 0,
             diastolic: reading.diastolic || 0,
             temperature: reading.temperature || 0,
@@ -46,10 +98,12 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           };
         });
         setHistoryData(processed);
+      } else {
+        setHistoryData([]);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Unable to load analytics data');
-      console.error(err);
+      console.error('Analytics fetch error:', err);
+      setHistoryData([]);
     } finally {
       setLoading(false);
     }
