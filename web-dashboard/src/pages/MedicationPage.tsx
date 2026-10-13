@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { ArrowLeft, Plus, X, Trash2 } from 'lucide-react';
-import { AuthContext } from '../context/AuthContext';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { usersAPI } from '../services/api';
 
 interface MedicationPageProps {
@@ -17,7 +16,6 @@ interface Medication {
 }
 
 const MedicationPage: React.FC<MedicationPageProps> = ({ onBack }) => {
-  const { user } = useContext(AuthContext);
   const [medications, setMedications] = useState<Medication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

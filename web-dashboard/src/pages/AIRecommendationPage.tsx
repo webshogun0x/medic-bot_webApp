@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, ArrowLeft, Sparkles, Loader, RefreshCw } from 'lucide-react';
-import { aiAPI, readingsAPI } from '../services/api';
+import { aiAPI } from '../services/api';
 
 interface AIRecommendationPageProps {
   onBack: () => void;
@@ -21,9 +21,7 @@ const AIRecommendationPage: React.FC<AIRecommendationPageProps> = ({ onBack }) =
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }]);
   const [inputValue, setInputValue] = useState('');
-  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -42,7 +40,6 @@ const AIRecommendationPage: React.FC<AIRecommendationPageProps> = ({ onBack }) =
 
     try {
       setSending(true);
-      setError(null);
 
       // Add user message
       const userMessage: Message = {
@@ -80,7 +77,6 @@ const AIRecommendationPage: React.FC<AIRecommendationPageProps> = ({ onBack }) =
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      setError(errorMessage);
     } finally {
       setSending(false);
     }

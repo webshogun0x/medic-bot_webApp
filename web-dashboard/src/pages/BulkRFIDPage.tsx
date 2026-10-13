@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Upload, Download, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { adminAPI } from '../services/api';
 
@@ -18,7 +18,6 @@ const BulkRFIDPage: React.FC<BulkRFIDPageProps> = ({ onBack }) => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [csvText, setCsvText] = useState('');
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -27,7 +26,6 @@ const BulkRFIDPage: React.FC<BulkRFIDPageProps> = ({ onBack }) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      setCsvText(text);
       parseCSV(text);
     };
     reader.readAsText(file);

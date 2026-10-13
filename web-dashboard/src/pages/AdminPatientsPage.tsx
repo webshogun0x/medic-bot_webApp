@@ -35,7 +35,26 @@ const AdminPatientsPage: React.FC<AdminPatientsPageProps> = ({ onBack }) => {
   }, []);
 
   useEffect(() => {
-    filterPatientsList();
+    let filtered = [...patients];
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(query) ||
+        p.email.toLowerCase().includes(query) ||
+        (p.rfidNumber && p.rfidNumber.toLowerCase().includes(query))
+      );
+    }
+
+    // RFID filter
+    if (filterRFID === 'assigned') {
+      filtered = filtered.filter(p => p.rfidNumber && p.rfidNumber !== 'Not assigned');
+    } else if (filterRFID === 'unassigned') {
+      filtered = filtered.filter(p => !p.rfidNumber || p.rfidNumber === 'Not assigned');
+    }
+
+    setFilteredPatients(filtered);
   }, [patients, searchQuery, filterRFID]);
 
   const fetchPatients = async () => {
@@ -62,29 +81,6 @@ const AdminPatientsPage: React.FC<AdminPatientsPageProps> = ({ onBack }) => {
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
-  };
-
-  const filterPatientsList = () => {
-    let filtered = [...patients];
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(p => 
-        `${p.firstName} ${p.lastName}`.toLowerCase().includes(query) ||
-        p.email.toLowerCase().includes(query) ||
-        (p.rfidNumber && p.rfidNumber.toLowerCase().includes(query))
-      );
-    }
-
-    // RFID filter
-    if (filterRFID === 'assigned') {
-      filtered = filtered.filter(p => p.rfidNumber && p.rfidNumber !== 'Not assigned');
-    } else if (filterRFID === 'unassigned') {
-      filtered = filtered.filter(p => !p.rfidNumber || p.rfidNumber === 'Not assigned');
-    }
-
-    setFilteredPatients(filtered);
   };
 
   const handleViewPatient = (uid: string) => {

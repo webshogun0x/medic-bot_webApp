@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  ArrowLeft, User, Heart, Activity, Thermometer, Droplets, 
-  Calendar, Phone, Mail, CreditCard, Download, AlertTriangle,
-  Scale, Ruler, ChevronRight, TrendingUp
+  ArrowLeft, Activity, Droplets, Phone, Mail, 
+  Download, AlertTriangle, Scale, Ruler, TrendingUp
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import { database } from '../context/AuthContext';
@@ -22,23 +21,14 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
   const [patient, setPatient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [showRFIDModal, setShowRFIDModal] = useState(false);
-  const [rfidInput, setRfidInput] = useState('');
-  const [actionLoading, setActionLoading] = useState(false);
   const [historyData, setHistoryData] = useState<any[]>([]);
 
-  useEffect(() => {
-    if (uid) {
-      fetchPatientDetails();
-    }
-  }, [uid]);
-
-  const fetchPatientDetails = async () => {
+  const fetchPatientDetails = useCallback(async () => {
+    if (!uid) return;
     try {
       setLoading(true);
       setError(null);
-      const response = await adminAPI.getPatientDetails(uid!);
+      const response = await adminAPI.getPatientDetails(uid);
       const patientData = response.data;
       setPatient(patientData);
       
@@ -77,22 +67,11 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [uid]);
 
-  const handleAssignRFID = async () => {
-    if (!rfidInput.trim()) return;
-    try {
-      setActionLoading(true);
-      await adminAPI.assignRFID(uid!, rfidInput);
-      setSuccess('RFID assigned successfully');
-      setShowRFIDModal(false);
-      fetchPatientDetails();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to assign RFID');
-    } finally {
-      setActionLoading(false);
-    }
-  };
+  useEffect(() => {
+    fetchPatientDetails();
+  }, [fetchPatientDetails]);
 
   const styles = {
     container: { padding: '24px', backgroundColor: '#f4f7fe', minHeight: '100vh' },
@@ -110,6 +89,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
   };
 
   if (loading) return <div style={{textAlign:'center', padding:'100px'}}>Loading Diagnostic Data...</div>;
+  if (error || !patient) return <div style={{textAlign:'center', padding:'100px', color: '#e53e3e'}}>{error || 'Patient not found'}</div>;
 
   const { profile } = patient;
 

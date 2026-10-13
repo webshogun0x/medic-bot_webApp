@@ -8,7 +8,7 @@ interface ProfilePageProps {
 }
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
-  const { userProfile, user, refreshUserProfile } = useContext(AuthContext);
+  const { userProfile, refreshUserProfile } = useContext(AuthContext);
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

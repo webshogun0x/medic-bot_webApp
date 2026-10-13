@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { ArrowLeft, Download, Calendar, Activity, Info } from 'lucide-react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
+import { ArrowLeft, Download, Activity } from 'lucide-react';
 import { AuthContext, database } from '../context/AuthContext';
 import { ref, get } from 'firebase/database';
 import { readingsAPI } from '../services/api';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-  ResponsiveContainer, AreaChart, Area, ReferenceLine, ComposedChart, Bar 
+  ResponsiveContainer, AreaChart, Area, ReferenceLine, ComposedChart 
 } from 'recharts';
 
 interface AnalyticsPageProps {
@@ -17,16 +17,10 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
   const [days, setDays] = useState(30);
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [days, userProfile]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
       const rfid = userProfile?.rfidNumber || userProfile?.rfid;
       const cutoffTime = Date.now() - (days * 86400000);
 
@@ -107,7 +101,11 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [days, userProfile]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
 
   const styles = {
     container: { padding: '24px', backgroundColor: '#f3f4f6', minHeight: '100vh' },

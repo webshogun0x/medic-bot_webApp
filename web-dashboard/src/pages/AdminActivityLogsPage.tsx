@@ -28,7 +28,11 @@ const AdminActivityLogsPage: React.FC<AdminActivityLogsPageProps> = ({ onBack })
   }, []);
 
   useEffect(() => {
-    filterLogsList();
+    if (filterAction === 'all') {
+      setFilteredLogs(logs);
+    } else {
+      setFilteredLogs(logs.filter(log => log.action === filterAction));
+    }
   }, [logs, filterAction]);
 
   const fetchLogs = async () => {
@@ -41,14 +45,6 @@ const AdminActivityLogsPage: React.FC<AdminActivityLogsPageProps> = ({ onBack })
       setError(err.response?.data?.error || 'Failed to load activity logs');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const filterLogsList = () => {
-    if (filterAction === 'all') {
-      setFilteredLogs(logs);
-    } else {
-      setFilteredLogs(logs.filter(log => log.action === filterAction));
     }
   };
 
