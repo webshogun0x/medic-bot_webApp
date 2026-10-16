@@ -45,6 +45,72 @@ router.get('/patients', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 
+// Create new patient (Admin)
+router.post('/patients', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { firstName, lastName, email, phone, gender, dateOfBirth, bloodType, medicalId, rfidNumber, emergencyContact, allergies, medicalHistory } = req.body;
+
+    if (!firstName || !lastName) {
+      return res.status(400).json({ error: 'First name and last name are required' });
+    }
+
+    const newUid = 'pt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const finalMedicalId = medicalId || ('MB-' + Math.random().toString(36).substring(2, 8).toUpperCase());
+
+    const profileData = {
+      firstName,
+      lastName,
+      email: email || '',
+      phone: phone || '',
+      gender: gender || 'Not specified',
+      dateOfBirth: dateOfBirth || '',
+      bloodType: bloodType || '',
+      medicalId: finalMedicalId,
+      rfidNumber: rfidNumber || '',
+      emergencyContact: emergencyContact || '',
+      allergies: allergies || '',
+      medicalHistory: medicalHistory || '',
+      biometric_enrolled: false,
+      fingerprint_registered: false,
+      createdAt: Date.now(),
+      createdBy: req.user.uid
+    };
+
+    if (rfidNumber) {
+      const existing = await db.ref(`RFID_MAPPING/${rfidNumber}`).once('value');
+      if (existing.exists() && existing.val().userId !== newUid) {
+        return res.status(400).json({ error: 'This RFID card is already assigned to another patient' });
+      }
+      await db.ref(`RFID_MAPPING/${rfidNumber}`).set({
+        userId: newUid,
+        linkedAt: Date.now(),
+        assignedBy: req.user.uid
+      });
+      await db.ref(`USERS/${rfidNumber}`).set({
+        name: `${firstName} ${lastName}`,
+        first_name: firstName,
+        last_name: lastName,
+        rfid: rfidNumber,
+        medical_id: finalMedicalId,
+        biometric_enrolled: false,
+        fingerprint_registered: false,
+        linkedAt: Date.now()
+      });
+    }
+
+    await db.ref(`USERS/${newUid}/profile`).set(profileData);
+
+    res.json({
+      success: true,
+      message: 'Patient registered successfully',
+      patient: { uid: newUid, ...profileData }
+    });
+  } catch (error) {
+    console.error('Create patient error:', error);
+    res.status(500).json({ error: 'Failed to create patient: ' + error.message });
+  }
+});
+
 // Get patient details
 router.get('/patients/:uid', verifyToken, verifyAdmin, async (req, res) => {
   try {

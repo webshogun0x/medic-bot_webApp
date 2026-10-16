@@ -7,6 +7,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
   ResponsiveContainer, AreaChart, Area, ReferenceLine, ComposedChart 
 } from 'recharts';
+import { formatFloat } from '../utils/format';
 
 interface AnalyticsPageProps {
   onBack: () => void;
@@ -134,7 +135,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           <p style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1f2937' }}>{payload[0].payload.fullDate}</p>
           {payload.map((item: any, index: number) => (
             <p key={index} style={{ color: item.color, fontSize: '14px', margin: '4px 0' }}>
-              {item.name}: <span style={{ fontWeight: '600' }}>{item.value}</span>
+              {item.name}: <span style={{ fontWeight: '600' }}>{typeof item.value === 'number' ? formatFloat(item.value, 4) : item.value}</span>
             </p>
           ))}
         </div>

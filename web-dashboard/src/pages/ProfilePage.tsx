@@ -119,9 +119,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
             <ArrowLeft size={20} /> Back to Dashboard
           </button>
           <div>
-            <h1 style={styles.title}>Clinical Patient Identity & Hardware Hub</h1>
+            <h1 style={styles.title}>Clinical Patient Identity & Diagnostic Hub</h1>
             <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-              Biometric credentials, hardware device binding, and personal health baseline
+              Biometric credentials, clinic device binding, and personal health baseline
             </div>
           </div>
         </div>
@@ -197,8 +197,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
 
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '11px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>TELEMETRY STATUS</div>
-          <div style={{ fontSize: '16px', fontWeight: '800', marginTop: '2px' }}>Real-time Firebase RTDB</div>
-          <div style={{ fontSize: '12px', opacity: 0.85, marginTop: '2px' }}>Kiosk Station: Model S3-100</div>
+          <div style={{ fontSize: '16px', fontWeight: '800', marginTop: '2px' }}>Real-time Cloud Connected</div>
+          <div style={{ fontSize: '12px', opacity: 0.85, marginTop: '2px' }}>Station: MediBot Health Kiosk</div>
         </div>
       </div>
 
@@ -206,7 +206,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>
           <Activity size={20} color="#0284c7" />
-          Hardware & Biometric Credential Diagnostics
+          Kiosk Credentials & Biometric Identity
         </h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
           {/* RFID CARD BADGE */}
@@ -238,13 +238,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
               </div>
               <p style={{ fontSize: '12px', color: '#475569', margin: '8px 0 0 0' }}>
                 {hasRFID 
-                  ? 'Your RFID card taps at the RC522 sensor on the MediBot kiosk to log you in within 200 ms.' 
+                  ? 'Your RFID card taps at the contactless reader on the MediBot kiosk to log you in instantly.' 
                   : 'Contact your clinic administrator or kiosk staff to scan and bind an RFID badge to your profile.'}
               </p>
             </div>
           </div>
 
-          {/* AS608 FINGERPRINT BADGE */}
+          {/* BIOMETRIC FINGERPRINT BADGE */}
           <div style={{
             padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0',
             backgroundColor: isBiometricEnrolled ? '#f8fafc' : '#fffbeb', display: 'flex', gap: '16px', alignItems: 'flex-start'
@@ -259,7 +259,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>AS608 Optical Biometric</span>
+                <span style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>Biometric Fingerprint Authentication</span>
                 <span style={{
                   fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px',
                   backgroundColor: isBiometricEnrolled ? '#dcfce7' : '#fef3c7',
@@ -269,11 +269,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onBack }) => {
                 </span>
               </div>
               <div style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
-                Kiosk EEPROM Template: <strong>{isBiometricEnrolled ? `Slot #${fpSlot} Verified` : 'Pending Kiosk Enrollment'}</strong>
+                Biometric Template: <strong>{isBiometricEnrolled ? `Biometric Slot #${fpSlot} Active` : 'Pending Kiosk Enrollment'}</strong>
               </div>
               <p style={{ fontSize: '12px', color: '#475569', margin: '8px 0 0 0' }}>
                 {isBiometricEnrolled 
-                  ? 'Your fingerprint template is stored directly in the AS608 optical sensor flash memory for instant touch login.' 
+                  ? 'Your fingerprint template is registered in the kiosk biometric memory for instant touch login.' 
                   : 'Step up to the MediBot health kiosk, tap your RFID badge, and follow voice prompts to enroll your fingerprint.'}
               </p>
             </div>

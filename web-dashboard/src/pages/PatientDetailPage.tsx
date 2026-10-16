@@ -13,6 +13,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, 
   ResponsiveContainer, AreaChart, Area, ReferenceLine, ComposedChart, Legend 
 } from 'recharts';
+import { formatFloat } from '../utils/format';
 
 interface PatientDetailPageProps {
   onBack: () => void;
@@ -178,12 +179,12 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
       h.diastolic,
       h.heartRate,
       h.spo2,
-      h.heightLaser,
-      h.heightSonar,
-      h.bmiLaser,
-      h.bmiSonar,
-      h.weight,
-      h.temperature
+      formatFloat(h.heightLaser, 4),
+      formatFloat(h.heightSonar, 4),
+      formatFloat(h.bmiLaser, 4),
+      formatFloat(h.bmiSonar, 4),
+      formatFloat(h.weight, 4),
+      formatFloat(h.temperature, 4)
     ]);
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -416,11 +417,11 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
           {/* BMI LASER */}
           <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Laser BMI (VL53L0X)</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Laser BMI (Optical)</span>
               <TrendingUp size={16} color="#0284c7" />
             </div>
             <div style={{ fontSize: '22px', fontWeight: '800', color: '#0284c7' }}>
-              {bmiLaserVal || '--'}
+              {bmiLaserVal ? formatFloat(bmiLaserVal, 4) : '--'}
               <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg/m²</span>
             </div>
             <div style={{ marginTop: '8px' }}>
@@ -433,16 +434,16 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
           {/* BMI SONAR */}
           <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Sonar BMI (HC-SR04)</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Sonar BMI (Acoustic)</span>
               <TrendingUp size={16} color="#9333ea" />
             </div>
             <div style={{ fontSize: '22px', fontWeight: '800', color: '#9333ea' }}>
-              {bmiSonarVal || '--'}
+              {bmiSonarVal ? formatFloat(bmiSonarVal, 4) : '--'}
               <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg/m²</span>
             </div>
             <div style={{ marginTop: '8px' }}>
               <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', backgroundColor: '#f3e8ff', color: '#7e22ce' }}>
-                Auxiliary Cross-check
+                Acoustic Verification
               </span>
             </div>
           </div>
@@ -454,12 +455,12 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
               <Scale size={16} color="#059669" />
             </div>
             <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
-              {latestReading?.weight ? `${latestReading.weight}` : '--'}
+              {latestReading?.weight ? formatFloat(latestReading.weight, 4) : '--'}
               <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg</span>
             </div>
             <div style={{ marginTop: '8px' }}>
               <span style={{ fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px', backgroundColor: '#f1f5f9', color: '#475569' }}>
-                HX711 Strain Gauge
+                Precision Load Cell Platform
               </span>
             </div>
           </div>
@@ -471,7 +472,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
               <Activity size={16} color="#d97706" />
             </div>
             <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
-              {latestReading?.temperature ? `${latestReading.temperature}` : '--'}
+              {latestReading?.temperature ? formatFloat(latestReading.temperature, 4) : '--'}
               <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>°C</span>
             </div>
             <div style={{ marginTop: '8px' }}>
@@ -513,8 +514,8 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
                 <Legend />
                 <ReferenceLine y={25} stroke="#f59e0b" strokeDasharray="3 3" label={{ position: 'right', value: 'Overweight (25)', fill: '#d97706', fontSize: 10 }} />
                 <ReferenceLine y={18.5} stroke="#3b82f6" strokeDasharray="3 3" label={{ position: 'right', value: 'Underweight (18.5)', fill: '#2563eb', fontSize: 10 }} />
-                <Line name="Laser BMI (VL53L0X)" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{ r: 4 }} />
-                <Line name="Sonar BMI (HC-SR04)" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{ r: 4 }} />
+                <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
           )}
@@ -555,7 +556,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={styles.subTitle}><Droplets size={20} color="#0284c7" /> Pulse Oximetry (SpO2)</h3>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '6px' }}>
-              MAX30102 Optical Sensor
+              Optical Pulse Sensor
             </span>
           </div>
           {historyData.length === 0 ? (
@@ -735,14 +736,14 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Heart Rate (Resting)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>MAX30102 PPG Optical</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Photoplethysmography (PPG) Optical</td>
                       <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.heartRate || latestReading?.heart_rate || 'N/A'} bpm</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>60 - 100 bpm</td>
                       <td style={{ padding: '8px', color: '#16a34a' }}>Normal Sinus Rhythm</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Blood Oxygen (SpO2)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>MAX30102 Red/IR Ratio</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Optical Pulse Oximeter (Spectrophotometry)</td>
                       <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.spo2 ? `${latestReading.spo2}%` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>95 - 100%</td>
                       <td style={{ padding: '8px', color: (latestReading?.spo2 && latestReading.spo2 < 95) ? '#dc2626' : '#16a34a' }}>
@@ -751,29 +752,29 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Laser)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>VL53L0X ToF Laser</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiLaserVal || 'N/A'} kg/m²</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Optical Time-of-Flight Laser Stadiometer</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiLaserVal ? `${formatFloat(bmiLaserVal, 4)} kg/m²` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
                       <td style={{ padding: '8px', color: bmiCategory.color, fontWeight: '700' }}>{bmiCategory.label}</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Sonar)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>HC-SR04 Ultrasonic</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiSonarVal || 'N/A'} kg/m²</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Acoustic Ultrasonic Stadiometer</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiSonarVal ? `${formatFloat(bmiSonarVal, 4)} kg/m²` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>Auxiliary Correlation</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Patient Weight</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>HX711 4-Point Load Cell</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.weight ? `${latestReading.weight} kg` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Precision Load Cell Platform</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.weight ? `${formatFloat(latestReading.weight, 4)} kg` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>Individual Baseline</td>
                       <td style={{ padding: '8px', color: '#16a34a' }}>Calibrated</td>
                     </tr>
                     <tr>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Body Temperature</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>Medical Infrared / Contact</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.temperature ? `${latestReading.temperature} °C` : 'N/A'}</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.temperature ? `${formatFloat(latestReading.temperature, 4)} °C` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>36.5 - 37.5 °C</td>
                       <td style={{ padding: '8px', color: '#16a34a' }}>Afebrile</td>
                     </tr>
@@ -789,8 +790,8 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
                 <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#334155' }}>
                   • Blood Pressure demonstrates <strong>{bpCategory.label}</strong> ({latestReading?.systolic || '--'}/{latestReading?.diastolic || '--'} mmHg) per AHA guidelines.<br />
                   • Oxygenation index is verified at <strong>{latestReading?.spo2 || '--'}%</strong> via continuous photoplethysmography.<br />
-                  • Dual stadiometer sensor agreement (Laser ToF: {latestReading?.heightLaser || '--'}m vs Sonar: {latestReading?.heightSonar || '--'}m) indicates reliable stature acquisition.<br />
-                  • Patient baseline BMI classified as <strong>{bmiCategory.label}</strong> ({bmiLaserVal || bmiSonarVal || '--'} kg/m²).
+                  • Dual stadiometer sensor agreement (Laser ToF: {latestReading?.heightLaser ? formatFloat(latestReading.heightLaser, 4) : '--'}m vs Sonar: {latestReading?.heightSonar ? formatFloat(latestReading.heightSonar, 4) : '--'}m) indicates reliable stature acquisition.<br />
+                  • Patient baseline BMI classified as <strong>{bmiCategory.label}</strong> ({bmiLaserVal ? formatFloat(bmiLaserVal, 4) : (bmiSonarVal ? formatFloat(bmiSonarVal, 4) : '--')} kg/m²).
                 </div>
               </div>
 
@@ -819,7 +820,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
               {/* Physician Review & Signature Block */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Examined via MediBot Kiosk Model S3-100</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Examined via MediBot Clinical Health Station</div>
                   <div style={{ fontSize: '11px', color: '#94a3b8' }}>Secure Telehealth Digital Signature Verification Token</div>
                 </div>
                 <div style={{ textAlign: 'center', width: '220px' }}>

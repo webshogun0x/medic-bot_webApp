@@ -54,3 +54,5 @@ SETUP_GUIDE.md
 START_HERE.md
 QUICK_START.md
 docs/
+.vercel
+.env*

@@ -51,6 +51,7 @@ export const dashboardAPI = {
 
 export const adminAPI = {
   getPatients: () => api.get('/admin/patients'),
+  createPatient: (data: any) => api.post('/admin/patients', data),
   getPatientDetails: (uid: string) => api.get(`/admin/patients/${uid}`),
   assignRFID: (uid: string, rfidNumber: string) => api.post(`/admin/patients/${uid}/assign-rfid`, { rfidNumber }),
   getStats: () => api.get('/admin/stats'),

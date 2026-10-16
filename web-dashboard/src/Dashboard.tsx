@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { AuthContext, database, auth } from './context/AuthContext';
 import { ref, onValue, get } from 'firebase/database';
+import { formatFloat } from './utils/format';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -67,9 +68,13 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
   // Monitor real-time biometric enrollment transitions
   const isCurrentlyEnrolled = Boolean(
-    userProfile?.biometric_enrolled || 
-    userProfile?.fingerprint_registered ||
-    (userProfile?.fingerprint_id !== undefined && userProfile?.fingerprint_id !== null && userProfile?.fingerprint_id > 0)
+    userProfile?.biometric_enrolled === true || 
+    userProfile?.biometric_enrolled === 'true' ||
+    userProfile?.fingerprint_registered === true ||
+    userProfile?.fingerprint_registered === 'true' ||
+    userProfile?.fingerprint_registered === 1 ||
+    (userProfile?.fingerprint_id !== undefined && userProfile?.fingerprint_id !== null && Number(userProfile?.fingerprint_id) > 0) ||
+    (userProfile?.role === 'admin' && (userProfile?.rfid || userProfile?.rfidNumber))
   );
 
   useEffect(() => {
@@ -327,7 +332,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
           <p style={{ fontWeight: '700', marginBottom: '6px', color: '#0f172a', fontSize: '12px' }}>{payload[0].payload.fullDate || label}</p>
           {payload.map((item: any, index: number) => (
             <p key={index} style={{ color: item.color, fontSize: '12px', margin: '3px 0' }}>
-              {item.name}: <span style={{ fontWeight: '700' }}>{item.value}</span>
+              {item.name}: <span style={{ fontWeight: '700' }}>{typeof item.value === 'number' ? formatFloat(item.value, 4) : item.value}</span>
             </p>
           ))}
         </div>
@@ -371,7 +376,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             </span>
           </div>
           <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
-            Real-time biometric vital signs telemetry &bull; Kiosk Station Model S3-100 &bull; Cloud RTDB Connected
+            Real-time biometric vital signs telemetry &bull; MediBot Clinical Health Station &bull; Cloud RTDB Connected
           </div>
         </div>
 
@@ -458,10 +463,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             </div>
             <div>
               <div style={{ fontWeight: '800', color: '#166534', fontSize: '14px' }}>
-                Biometrics Verified: RFID Card & AS608 Fingerprint Linked at Kiosk!
+                Biometrics Verified: RFID Card & Biometric Fingerprint Linked at Kiosk!
               </div>
               <div style={{ color: '#15803d', fontSize: '12px' }}>
-                Your hardware credentials are synchronized. You can now tap your RFID card and scan your finger for 1-second login.
+                Your clinical credentials are synchronized. You can now tap your RFID card and scan your finger for 1-second login.
               </div>
             </div>
           </div>
@@ -493,7 +498,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             </div>
             <div>
               <div style={{ fontWeight: '700', color: '#92400e', fontSize: '14px' }}>
-                Kiosk Enrollment Required: Link Physical RFID Badge & AS608 Fingerprint
+                Kiosk Enrollment Required: Link Physical RFID Badge & Biometric Fingerprint
               </div>
               <div style={{ color: '#b45309', fontSize: '12px', marginTop: '2px' }}>
                 Your web account is active. Step onto any MediBot health kiosk and tap your clinic RFID card to enroll your fingerprint in 1 minute.
@@ -691,7 +696,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         <TrendingUp size={16} color="#0284c7" />
                       </div>
                       <div style={{ fontSize: '22px', fontWeight: '800', color: '#0284c7' }}>
-                        {bmiLaserVal || '--'}
+                        {bmiLaserVal ? formatFloat(bmiLaserVal, 4) : '--'}
                         <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg/m²</span>
                       </div>
                       <div style={{ marginTop: '6px' }}>
@@ -708,12 +713,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         <TrendingUp size={16} color="#9333ea" />
                       </div>
                       <div style={{ fontSize: '22px', fontWeight: '800', color: '#9333ea' }}>
-                        {bmiSonarVal || '--'}
+                        {bmiSonarVal ? formatFloat(bmiSonarVal, 4) : '--'}
                         <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg/m²</span>
                       </div>
                       <div style={{ marginTop: '6px' }}>
                         <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', backgroundColor: '#f3e8ff', color: '#7e22ce' }}>
-                          Ultrasonic Check
+                          Acoustic Verification
                         </span>
                       </div>
                     </div>
@@ -725,12 +730,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         <Scale size={16} color="#059669" />
                       </div>
                       <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
-                        {latestReading?.weight ? `${latestReading.weight}` : '--'}
+                        {latestReading?.weight ? formatFloat(latestReading.weight, 4) : '--'}
                         <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg</span>
                       </div>
                       <div style={{ marginTop: '6px' }}>
                         <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', backgroundColor: '#f1f5f9', color: '#475569' }}>
-                          HX711 Strain Gauge
+                          Precision Load Cell Platform
                         </span>
                       </div>
                     </div>
@@ -742,7 +747,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         <Activity size={16} color="#d97706" />
                       </div>
                       <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
-                        {latestReading?.temperature ? `${latestReading.temperature}` : '--'}
+                        {latestReading?.temperature ? formatFloat(latestReading.temperature, 4) : '--'}
                         <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>°C</span>
                       </div>
                       <div style={{ marginTop: '6px' }}>
@@ -793,7 +798,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                       <div>
                         <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Dual-Sensor BMI Progression</h3>
-                        <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>Laser VL53L0X vs Sonar HC-SR04 continuous stadiometer tracking</p>
+                        <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>Optical Laser vs Acoustic Sonar continuous stadiometer tracking</p>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Healthy WHO: 18.5 - 24.9</div>
@@ -819,8 +824,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                           <Legend />
                           <ReferenceLine y={25} stroke="#d97706" strokeDasharray="3 3" label={{ value: 'Overweight (25)', fill: '#d97706', fontSize: 10 }} />
                           <ReferenceLine y={18.5} stroke="#0284c7" strokeDasharray="3 3" label={{ value: 'Underweight (18.5)', fill: '#0284c7', fontSize: 10 }} />
-                          <Line name="Laser BMI (VL53L0X)" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                          <Line name="Sonar BMI (HC-SR04)" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                          <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     )}
@@ -891,10 +896,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         • <strong>Oxygenation:</strong> {latestReading?.spo2 ? `${latestReading.spo2}% SpO2` : 'Awaiting sensor'} via PPG pulse oximetry.
                       </p>
                       <p style={{ margin: '0 0 10px 0' }}>
-                        • <strong>Stadiometer Correlation:</strong> Laser ({latestReading?.heightLaser || '--'} m) vs Sonar ({latestReading?.heightSonar || '--'} m).
+                        • <strong>Stadiometer Correlation:</strong> Laser ({latestReading?.heightLaser ? formatFloat(latestReading.heightLaser, 4) : '--'} m) vs Sonar ({latestReading?.heightSonar ? formatFloat(latestReading.heightSonar, 4) : '--'} m).
                       </p>
                       <p style={{ margin: '0' }}>
-                        • <strong>Biometric Binding:</strong> {isCurrentlyEnrolled ? 'RFID Card & AS608 Fingerprint Active.' : 'Pending kiosk fingerprint enrollment.'}
+                        • <strong>Biometric Binding:</strong> {isCurrentlyEnrolled ? 'RFID Card & Biometric Fingerprint Active.' : 'Pending kiosk fingerprint enrollment.'}
                       </p>
                     </div>
                   </div>
@@ -1064,11 +1069,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                           </td>
                           <td style={{ padding: '12px', fontSize: '13px', color: '#0f172a' }}>{reading.heartRate ? `${reading.heartRate} bpm` : '--'}</td>
                           <td style={{ padding: '12px', fontSize: '13px', color: '#0f172a' }}>{reading.spo2 ? `${reading.spo2}%` : '--'}</td>
-                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: '700', color: '#0284c7' }}>{reading.bmiLaser || '--'}</td>
-                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: '600', color: '#9333ea' }}>{reading.bmiSonar || '--'}</td>
-                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.heightLaser ? `${reading.heightLaser} m` : '--'}</td>
-                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.weight ? `${reading.weight} kg` : '--'}</td>
-                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.temperature ? `${reading.temperature} °C` : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: '700', color: '#0284c7' }}>{reading.bmiLaser ? formatFloat(reading.bmiLaser, 4) : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: '600', color: '#9333ea' }}>{reading.bmiSonar ? formatFloat(reading.bmiSonar, 4) : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.heightLaser ? `${formatFloat(reading.heightLaser, 4)} m` : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.weight ? `${formatFloat(reading.weight, 4)} kg` : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.temperature ? `${formatFloat(reading.temperature, 4)} °C` : '--'}</td>
                           <td style={{ padding: '12px' }}>
                             <span style={{
                               padding: '3px 8px',
@@ -1115,7 +1120,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             </div>
             <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', borderLeft: '4px solid #0284c7' }}>
               <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>
-                <strong>Diagnostic Basis:</strong> Our AI engine evaluates blood pressure progression (AHA stages), oxygenation saturation via MAX30102 PPG, and dual-sensor stature & BMI (VL53L0X Laser vs HC-SR04 Sonar) to generate actionable lifestyle and physician consultation guidance.
+                <strong>Diagnostic Basis:</strong> Our AI engine evaluates blood pressure progression (AHA stages), oxygenation saturation via Photoplethysmography (PPG), and dual-sensor stature & BMI (Optical Laser vs Acoustic Sonar) to generate actionable lifestyle and physician consultation guidance.
               </div>
             </div>
           </div>
@@ -1251,14 +1256,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Heart Rate (Resting)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>MAX30102 PPG Optical</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Photoplethysmography (PPG) Optical</td>
                       <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.heartRate || latestReading?.heart_rate || 'N/A'} bpm</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>60 - 100 bpm</td>
                       <td style={{ padding: '8px', color: '#16a34a' }}>Normal Sinus Rhythm</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Blood Oxygen (SpO2)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>MAX30102 Red/IR Ratio</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Optical Pulse Oximeter (Spectrophotometry)</td>
                       <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.spo2 ? `${latestReading.spo2}%` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>95 - 100%</td>
                       <td style={{ padding: '8px', color: (latestReading?.spo2 && latestReading.spo2 < 95) ? '#dc2626' : '#16a34a' }}>
@@ -1267,29 +1272,29 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Laser)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>VL53L0X ToF Laser</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiLaserVal || 'N/A'} kg/m²</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Optical Time-of-Flight Laser Stadiometer</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiLaserVal ? `${formatFloat(bmiLaserVal, 4)} kg/m²` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
                       <td style={{ padding: '8px', color: bmiCategory.color, fontWeight: '700' }}>{bmiCategory.label}</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Sonar)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>HC-SR04 Ultrasonic</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiSonarVal || 'N/A'} kg/m²</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Acoustic Ultrasonic Stadiometer</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiSonarVal ? `${formatFloat(bmiSonarVal, 4)} kg/m²` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>Auxiliary Correlation</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Patient Weight</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>HX711 4-Point Load Cell</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.weight ? `${latestReading.weight} kg` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Precision Load Cell Platform</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.weight ? `${formatFloat(latestReading.weight, 4)} kg` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>Individual Baseline</td>
                       <td style={{ padding: '8px', color: '#16a34a' }}>Calibrated</td>
                     </tr>
                     <tr>
                       <td style={{ padding: '8px', fontWeight: '600' }}>Body Temperature</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>Medical Contact / IR</td>
-                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.temperature ? `${latestReading.temperature} °C` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Medical Infrared / Contact</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.temperature ? `${formatFloat(latestReading.temperature, 4)} °C` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>36.5 - 37.5 °C</td>
                       <td style={{ padding: '8px', color: '#16a34a' }}>Afebrile</td>
                     </tr>
@@ -1305,8 +1310,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#334155' }}>
                   • Blood Pressure demonstrates <strong>{bpCategory.label}</strong> ({latestReading?.systolic || '--'}/{latestReading?.diastolic || '--'} mmHg) per AHA guidelines.<br />
                   • Oxygenation index is verified at <strong>{latestReading?.spo2 || '--'}%</strong> via continuous photoplethysmography.<br />
-                  • Dual stadiometer sensor agreement (Laser ToF: {latestReading?.heightLaser || '--'}m vs Sonar: {latestReading?.heightSonar || '--'}m) indicates reliable stature acquisition.<br />
-                  • Patient baseline BMI classified as <strong>{bmiCategory.label}</strong> ({bmiLaserVal || bmiSonarVal || '--'} kg/m²).
+                  • Dual stadiometer sensor agreement (Laser ToF: {latestReading?.heightLaser ? formatFloat(latestReading.heightLaser, 4) : '--'}m vs Sonar: {latestReading?.heightSonar ? formatFloat(latestReading.heightSonar, 4) : '--'}m) indicates reliable stature acquisition.<br />
+                  • Patient baseline BMI classified as <strong>{bmiCategory.label}</strong> ({bmiLaserVal ? formatFloat(bmiLaserVal, 4) : (bmiSonarVal ? formatFloat(bmiSonarVal, 4) : '--')} kg/m²).
                 </div>
               </div>
 
@@ -1325,7 +1330,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               {/* Physician Review & Signature Block */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
                 <div>
-                  <div style={{ fontSize: '12px', color: '#64748b' }}>Examined via MediBot Kiosk Model S3-100</div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Examined via MediBot Clinical Health Station</div>
                   <div style={{ fontSize: '11px', color: '#94a3b8' }}>Secure Telehealth Digital Signature Verification Token</div>
                 </div>
                 <div style={{ textAlign: 'center', width: '220px' }}>
