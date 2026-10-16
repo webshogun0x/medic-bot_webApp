@@ -64,12 +64,12 @@ const Sidebar = ({ isOpen, onNavigate, onLogout, currentPage, isAdmin = false }:
             borderBottom: '1px solid #374151'
           }}
         >
-          <div style={{ width: '40px', height: '40px', backgroundColor: '#2563eb', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Heart size={24} color="#fff" />
+          <div style={{ width: '40px', height: '40px', backgroundColor: '#0284c7', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Heart size={22} color="#fff" />
           </div>
           <div>
-            <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>MediBot</div>
-            <div style={{ fontSize: '11px', color: '#9ca3af' }}>Health Monitor</div>
+            <div style={{ fontSize: '15px', fontWeight: '800', color: '#fff', letterSpacing: '-0.3px' }}>MediBot</div>
+            <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Clinical Intelligence</div>
           </div>
         </div>
 

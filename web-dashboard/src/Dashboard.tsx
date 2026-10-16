@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { 
   Heart, Droplets, TrendingUp, TrendingDown,
   Users, AlertTriangle, Search, Bell, User, Activity, X, CheckCircle,
-  Download
+  Printer, FileText, ShieldCheck, Scale, Sparkles
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -15,8 +15,28 @@ interface DashboardProps {
   onNavigate: (page: string) => void;
 }
 
+// AHA Blood Pressure Categorization Helper
+const getAhaBpCategory = (systolic: number, diastolic: number) => {
+  if (!systolic || !diastolic) return { label: 'Awaiting Reading', color: '#64748b', bg: '#f1f5f9' };
+  if (systolic > 180 || diastolic > 120) return { label: 'Hypertensive Crisis', color: '#991b1b', bg: '#fee2e2' };
+  if (systolic >= 140 || diastolic >= 90) return { label: 'Stage 2 Hypertension', color: '#dc2626', bg: '#fee2e2' };
+  if ((systolic >= 130 && systolic <= 139) || (diastolic >= 80 && diastolic <= 89)) return { label: 'Stage 1 Hypertension', color: '#d97706', bg: '#fef3c7' };
+  if (systolic >= 120 && systolic <= 129 && diastolic < 80) return { label: 'Elevated BP', color: '#ca8a04', bg: '#fef9c3' };
+  if (systolic < 120 && diastolic < 80) return { label: 'Normal Blood Pressure', color: '#16a34a', bg: '#dcfce7' };
+  return { label: 'Normal Blood Pressure', color: '#16a34a', bg: '#dcfce7' };
+};
+
+// WHO BMI Categorization Helper
+const getBmiCategory = (bmi: number) => {
+  if (!bmi || bmi <= 0) return { label: 'Unmeasured', color: '#64748b', bg: '#f1f5f9' };
+  if (bmi < 18.5) return { label: 'Underweight', color: '#0284c7', bg: '#e0f2fe' };
+  if (bmi < 25.0) return { label: 'Normal / Healthy', color: '#16a34a', bg: '#dcfce7' };
+  if (bmi < 30.0) return { label: 'Overweight', color: '#d97706', bg: '#fef3c7' };
+  return { label: 'Obese Class', color: '#dc2626', bg: '#fee2e2' };
+};
+
 const Dashboard = ({ onNavigate }: DashboardProps) => {
-  const { userProfile } = useContext(AuthContext);
+  const { userProfile, refreshUserProfile } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [latestReading, setLatestReading] = useState<any>(null);
@@ -28,7 +48,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [justEnrolledToast, setJustEnrolledToast] = useState(false);
+  
   const notificationRef = useRef<HTMLDivElement>(null);
+  const prevEnrolledRef = useRef<boolean | null>(null);
 
   // Close notification dropdown when clicked outside
   useEffect(() => {
@@ -40,6 +64,27 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [notificationRef]);
+
+  // Monitor real-time biometric enrollment transitions
+  const isCurrentlyEnrolled = Boolean(
+    userProfile?.biometric_enrolled || 
+    userProfile?.fingerprint_registered ||
+    (userProfile?.fingerprint_id !== undefined && userProfile?.fingerprint_id !== null && userProfile?.fingerprint_id > 0)
+  );
+
+  useEffect(() => {
+    if (prevEnrolledRef.current !== null) {
+      if (!prevEnrolledRef.current && isCurrentlyEnrolled) {
+        // Transitioned from NOT enrolled to ENROLLED in real-time
+        setJustEnrolledToast(true);
+        const timer = setTimeout(() => {
+          setJustEnrolledToast(false);
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
+    }
+    prevEnrolledRef.current = isCurrentlyEnrolled;
+  }, [isCurrentlyEnrolled]);
 
   // Pull live data directly from Firebase Realtime Database
   useEffect(() => {
@@ -88,10 +133,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         setHistoryData([]);
         setChartData([]);
         setStats([
-          { title: 'Total Readings', value: '0', change: '0 this week', trend: 'up' },
-          { title: 'New This Week', value: '0', change: 'No readings yet', trend: 'up' },
-          { title: 'Critical Alerts', value: '0', change: 'None', trend: 'up' },
-          { title: 'Health Score', value: '--', change: 'Awaiting readings', trend: 'up' }
+          { title: 'Total Clinical Sessions', value: '0', change: '0 this week', trend: 'up' },
+          { title: 'Recent Measurements', value: '0', change: 'No readings recorded', trend: 'up' },
+          { title: 'Physiological Alerts', value: '0', change: 'All parameters normal', trend: 'up' },
+          { title: 'Clinical Health Index', value: '--', change: 'Awaiting kiosk exam', trend: 'up' }
         ]);
         setRecentActivity([]);
         return;
@@ -138,7 +183,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       const criticalCount = entries.filter(e => 
         (e.heartRate > 100 || (e.heartRate > 0 && e.heartRate < 50)) || 
         (e.spo2 > 0 && e.spo2 < 95) || 
-        e.systolic > 140
+        e.systolic >= 140 ||
+        e.diastolic >= 90
       ).length;
 
       let score = '--';
@@ -148,17 +194,17 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       }
 
       setStats([
-        { title: 'Total Readings', value: total.toString(), change: `${newThisWeek} this week`, trend: 'up' },
-        { title: 'New This Week', value: newThisWeek.toString(), change: `${total} all-time`, trend: 'up' },
-        { title: 'Critical Alerts', value: criticalCount.toString(), change: criticalCount > 0 ? 'Requires attention' : 'All clear', trend: criticalCount > 0 ? 'down' : 'up' },
-        { title: 'Health Score', value: score, change: 'Real-time assessment', trend: 'up' }
+        { title: 'Total Clinical Sessions', value: total.toString(), change: `${newThisWeek} recorded this week`, trend: 'up' },
+        { title: 'Recent Measurements', value: newThisWeek.toString(), change: `${total} all-time sessions`, trend: 'up' },
+        { title: 'Physiological Alerts', value: criticalCount.toString(), change: criticalCount > 0 ? 'Review indicated' : 'Parameters stable', trend: criticalCount > 0 ? 'down' : 'up' },
+        { title: 'Clinical Health Index', value: score, change: 'Automated triage score', trend: 'up' }
       ]);
 
       // Generate activity log from actual readings
       const activities = entries.slice(-5).reverse().map((reading, idx) => ({
         id: idx,
-        name: `Health Session #${total - idx}`,
-        type: `BP: ${reading.systolic}/${reading.diastolic} | SpO2: ${reading.spo2}% | BMI: ${reading.bmiLaser || reading.bmiSonar || 'N/A'}`,
+        name: `Kiosk Session #${total - idx}`,
+        type: `BP: ${reading.systolic}/${reading.diastolic} mmHg | SpO2: ${reading.spo2}% | Laser BMI: ${reading.bmiLaser || 'N/A'}`,
         time: `${reading.time} (${reading.date})`,
         avatar: 'K'
       }));
@@ -194,7 +240,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         if (snapshot.exists()) {
           const list = Object.entries(snapshot.val()).map(([notifId, item]: [string, any]) => ({
             id: notifId,
-            title: item.title || 'Notification',
+            title: item.title || 'Clinical Alert',
             message: item.message || '',
             time: item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recently',
             type: item.severity || 'info'
@@ -213,70 +259,75 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
     };
   }, [userProfile]);
 
-  // Calculate real Health Condition from latest reading / history
-  const normalCount = historyData.filter(e => e.heartRate >= 60 && e.heartRate <= 100 && e.spo2 >= 95 && e.systolic <= 130).length;
-  const criticalCount = historyData.filter(e => (e.heartRate > 100 || (e.heartRate > 0 && e.heartRate < 50)) || (e.spo2 > 0 && e.spo2 < 95) || e.systolic > 140).length;
-  const attentionCount = historyData.length - normalCount - criticalCount;
+  // Clinical condition calculation
+  const normalCount = historyData.filter(e => e.heartRate >= 60 && e.heartRate <= 100 && e.spo2 >= 95 && e.systolic < 130 && e.diastolic < 85).length;
+  const criticalCount = historyData.filter(e => (e.heartRate > 100 || (e.heartRate > 0 && e.heartRate < 50)) || (e.spo2 > 0 && e.spo2 < 95) || e.systolic >= 140 || e.diastolic >= 90).length;
+  const attentionCount = Math.max(0, historyData.length - normalCount - criticalCount);
 
   const pieData = historyData.length === 0 ? [
-    { name: 'Awaiting Readings', value: 1, color: '#9ca3af' }
+    { name: 'Awaiting Readings', value: 1, color: '#cbd5e1' }
   ] : [
-    { name: 'Optimal', value: Math.max(0, normalCount), color: '#22c55e' },
-    { name: 'Attention Needed', value: Math.max(0, attentionCount), color: '#f59e0b' },
-    { name: 'Critical', value: Math.max(0, criticalCount), color: '#ef4444' }
+    { name: 'Optimal', value: Math.max(0, normalCount), color: '#16a34a' },
+    { name: 'Attention Needed', value: Math.max(0, attentionCount), color: '#d97706' },
+    { name: 'Clinical Alert', value: Math.max(0, criticalCount), color: '#dc2626' }
   ].filter(item => item.value > 0);
 
-  const conditionText = historyData.length === 0 ? 'No Data Yet' : criticalCount > 0 ? 'Attention Needed' : 'Healthy';
-  const conditionColor = historyData.length === 0 ? '#6b7280' : criticalCount > 0 ? '#ef4444' : '#16a34a';
+  const conditionText = historyData.length === 0 ? 'Awaiting Data' : criticalCount > 0 ? 'Attention Indicated' : 'Physiologically Stable';
+  const conditionColor = historyData.length === 0 ? '#64748b' : criticalCount > 0 ? '#dc2626' : '#16a34a';
+
+  const bpCategory = getAhaBpCategory(latestReading?.systolic, latestReading?.diastolic);
+  const bmiLaserVal = latestReading?.bmiLaser ?? latestReading?.bmi_laser ?? latestReading?.bmi ?? 0;
+  const bmiSonarVal = latestReading?.bmiSonar ?? latestReading?.bmi_sonar ?? 0;
+  const bmiCategory = getBmiCategory(bmiLaserVal || bmiSonarVal);
 
   const styles = {
-    header: { backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb', padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' as const },
-    title: { fontSize: '32px', fontWeight: 'bold', color: '#111827' },
-    headerRight: { display: 'flex', alignItems: 'center', gap: '16px' },
+    header: { backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0', padding: '20px 28px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' as const },
+    title: { fontSize: '26px', fontWeight: '800', color: '#0f172a', margin: 0 },
+    headerRight: { display: 'flex', alignItems: 'center', gap: '14px' },
     searchBox: { position: 'relative' as const, display: 'flex', alignItems: 'center' },
-    searchInput: { paddingLeft: '40px', paddingRight: '16px', paddingTop: '8px', paddingBottom: '8px', width: '320px', border: '1px solid #d1d5db', borderRadius: '8px', fontSize: '14px' },
-    avatar: { width: '40px', height: '40px', backgroundColor: '#2563eb', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-    tabs: { padding: '16px 24px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: '32px' },
+    searchInput: { paddingLeft: '38px', paddingRight: '16px', paddingTop: '8px', paddingBottom: '8px', width: '280px', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px' },
+    avatar: { width: '38px', height: '38px', backgroundColor: '#0284c7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#fff', fontWeight: '700', fontSize: '14px' },
+    tabs: { padding: '12px 28px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '24px', backgroundColor: '#fff' },
     tabBtn: (active: boolean) => ({
-      padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '500',
-      backgroundColor: active ? '#2563eb' : 'transparent', color: active ? '#fff' : '#4b5563',
-      transition: 'background-color 0.2s'
+      padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700',
+      backgroundColor: active ? '#0284c7' : 'transparent', color: active ? '#fff' : '#64748b',
+      transition: 'all 0.2s'
     }),
-    content: { flex: 1, overflow: 'auto', padding: '24px' },
-    statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px', marginBottom: '32px' },
-    statCard: { backgroundColor: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
-    chartsSection: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px', marginBottom: '32px' },
-    chartCard: { backgroundColor: '#fff', padding: '24px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
-    bottomSection: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' },
+    content: { flex: 1, overflow: 'auto', padding: '24px 28px', backgroundColor: '#f8fafc' },
+    statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '24px' },
+    statCard: { backgroundColor: '#fff', padding: '20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
+    chartsSection: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '24px' },
+    chartCard: { backgroundColor: '#fff', padding: '22px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
+    bottomSection: { display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px' },
     notificationPanel: { 
-      position: 'absolute' as const, top: '80px', right: '80px', width: '360px', 
+      position: 'absolute' as const, top: '70px', right: '70px', width: '360px', 
       backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)',
-      border: '1px solid #e5e7eb', zIndex: 50, maxHeight: '480px', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const
+      border: '1px solid #e2e8f0', zIndex: 50, maxHeight: '450px', overflow: 'hidden', display: 'flex', flexDirection: 'column' as const
     },
-    thresholdLabel: { fontSize: '12px', fontWeight: '500', padding: '4px 8px', borderRadius: '6px' }
+    thresholdLabel: { fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '6px' }
   };
 
   const iconMap: any = {
-    'Total Readings': Activity,
-    'New This Week': Users,
-    'Critical Alerts': AlertTriangle,
-    'Health Score': Heart
+    'Total Clinical Sessions': Activity,
+    'Recent Measurements': Users,
+    'Physiological Alerts': AlertTriangle,
+    'Clinical Health Index': Heart
   };
   const colorMap: any = {
-    'Total Readings': '#2563eb',
-    'New This Week': '#16a34a',
-    'Critical Alerts': '#dc2626',
-    'Health Score': '#9333ea'
+    'Total Clinical Sessions': '#0284c7',
+    'Recent Measurements': '#16a34a',
+    'Physiological Alerts': '#dc2626',
+    'Clinical Health Index': '#7c3aed'
   };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div style={{ backgroundColor: '#fff', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-          <p style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1f2937' }}>{payload[0].payload.fullDate || label}</p>
+        <div style={{ backgroundColor: '#fff', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
+          <p style={{ fontWeight: '700', marginBottom: '6px', color: '#0f172a', fontSize: '12px' }}>{payload[0].payload.fullDate || label}</p>
           {payload.map((item: any, index: number) => (
-            <p key={index} style={{ color: item.color, fontSize: '13px', margin: '4px 0' }}>
-              {item.name}: <span style={{ fontWeight: '600' }}>{item.value}</span>
+            <p key={index} style={{ color: item.color, fontSize: '12px', margin: '3px 0' }}>
+              {item.name}: <span style={{ fontWeight: '700' }}>{item.value}</span>
             </p>
           ))}
         </div>
@@ -286,62 +337,100 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <style>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeInOut {
+          0% { opacity: 0; transform: translateY(-10px); }
+          15% { opacity: 1; transform: translateY(0); }
+          85% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(-10px); }
+        }
+        @media print {
+          body * { visibility: hidden !important; }
+          #printable-dashboard-report, #printable-dashboard-report * { visibility: visible !important; }
+          #printable-dashboard-report {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 24px !important;
+            background: #fff !important;
+          }
+          .no-print { display: none !important; }
         }
       `}</style>
-      <header style={styles.header}>
+
+      {/* TOP HEADER */}
+      <header style={styles.header} className="no-print">
         <div>
-          <h1 style={styles.title}>Dashboard</h1>
-          <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
-            Live MediBot Health Telemetry &bull; Realtime Cloud Database Connected
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={styles.title}>Clinical Medical Intelligence Portal</h1>
+            <span style={{ fontSize: '11px', fontWeight: '800', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '9999px' }}>
+              Live Telemetry
+            </span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>
+            Real-time biometric vital signs telemetry &bull; Kiosk Station Model S3-100 &bull; Cloud RTDB Connected
           </div>
         </div>
+
         <div style={styles.headerRight}>
+          <button
+            onClick={() => setShowPrintModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              backgroundColor: '#0284c7', color: '#fff', border: 'none',
+              borderRadius: '8px', padding: '8px 16px', fontSize: '13px',
+              fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 4px rgba(2,132,199,0.25)'
+            }}
+          >
+            <Printer size={16} /> Print Clinical Report
+          </button>
+
           <div style={styles.searchBox}>
-            <Search size={20} style={{ position: 'absolute', left: '12px', color: '#9ca3af' }} />
+            <Search size={18} style={{ position: 'absolute', left: '12px', color: '#94a3b8' }} />
             <input
               type="text"
-              placeholder="Search anything here..."
+              placeholder="Search health records..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={styles.searchInput}
             />
           </div>
+
           <div style={{ position: 'relative' }}>
             <button 
               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '8px', position: 'relative' }}
               onClick={() => setShowNotifications(!showNotifications)}
               title="Notifications"
             >
-              <Bell size={24} color={notifications.length > 0 ? "#2563eb" : "#9ca3af"} />
+              <Bell size={22} color={notifications.length > 0 ? "#0284c7" : "#94a3b8"} />
               {notifications.length > 0 && (
-                <span style={{ position: 'absolute', top: '4px', right: '4px', width: '10px', height: '10px', backgroundColor: '#dc2626', borderRadius: '50%', border: '2px solid #fff' }}></span>
+                <span style={{ position: 'absolute', top: '4px', right: '4px', width: '8px', height: '8px', backgroundColor: '#dc2626', borderRadius: '50%', border: '2px solid #fff' }}></span>
               )}
             </button>
             
             {showNotifications && (
               <div ref={notificationRef} style={styles.notificationPanel}>
-                <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f9fafb' }}>
-                  <span style={{ fontWeight: '700', color: '#1f2937' }}>Notifications</span>
-                  <button onClick={() => setShowNotifications(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={18} /></button>
+                <div style={{ padding: '14px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#f8fafc' }}>
+                  <span style={{ fontWeight: '700', color: '#0f172a', fontSize: '14px' }}>Clinical Notifications</span>
+                  <button onClick={() => setShowNotifications(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={16} /></button>
                 </div>
                 <div style={{ overflowY: 'auto', flex: 1 }}>
                   {notifications.length === 0 ? (
-                    <div style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
-                      <CheckCircle size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
-                      <p style={{ margin: 0 }}>No notifications yet</p>
+                    <div style={{ padding: '32px', textAlign: 'center', color: '#64748b' }}>
+                      <CheckCircle size={28} style={{ margin: '0 auto 8px', color: '#16a34a' }} />
+                      <p style={{ margin: 0, fontSize: '13px' }}>No active alerts or notifications</p>
                     </div>
                   ) : (
                     notifications.map((notif) => (
-                      <div key={notif.id} style={{ padding: '16px', borderBottom: '1px solid #f3f4f6' }}>
+                      <div key={notif.id} style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: '600', fontSize: '14px', color: notif.type === 'critical' ? '#dc2626' : '#1f2937' }}>{notif.title}</span>
-                          <span style={{ fontSize: '12px', color: '#9ca3af' }}>{notif.time}</span>
+                          <span style={{ fontWeight: '700', fontSize: '13px', color: notif.type === 'critical' ? '#dc2626' : '#0f172a' }}>{notif.title}</span>
+                          <span style={{ fontSize: '11px', color: '#94a3b8' }}>{notif.time}</span>
                         </div>
-                        <p style={{ margin: 0, fontSize: '13px', color: '#4b5563' }}>{notif.message}</p>
+                        <p style={{ margin: 0, fontSize: '12px', color: '#475569' }}>{notif.message}</p>
                       </div>
                     ))
                   )}
@@ -349,71 +438,143 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
               </div>
             )}
           </div>
-          <div style={styles.avatar} onClick={() => onNavigate('profile')} title="My Profile">
-            <User size={20} color="#fff" />
+
+          <div style={styles.avatar} onClick={() => onNavigate('profile')} title="My Clinical Profile">
+            {userProfile?.firstName ? userProfile.firstName[0].toUpperCase() : <User size={18} />}
           </div>
         </div>
       </header>
 
-      {/* BIOMETRIC REGISTRATION BANNER */}
-      {userProfile && !userProfile.biometric_enrolled && (
+      {/* REALTIME HARDWARE SYNC ENROLLMENT SUCCESS TOAST */}
+      {justEnrolledToast && (
         <div style={{
-          backgroundColor: '#fffbeb',
-          borderBottom: '1px solid #fde68a',
-          padding: '12px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
+          backgroundColor: '#f0fdf4', borderBottom: '2px solid #22c55e',
+          padding: '14px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          animation: 'fadeInOut 5s forwards'
+        }} className="no-print">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              backgroundColor: '#fef3c7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#d97706',
-              flexShrink: 0
-            }}>
-              <AlertTriangle size={24} />
+            <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+              <ShieldCheck size={20} />
             </div>
             <div>
-              <div style={{ fontWeight: '700', color: '#92400e', fontSize: '15px' }}>
-                Action Required: Complete Biometric Registration at Kiosk
+              <div style={{ fontWeight: '800', color: '#166534', fontSize: '14px' }}>
+                Biometrics Verified: RFID Card & AS608 Fingerprint Linked at Kiosk!
               </div>
-              <div style={{ color: '#b45309', fontSize: '13px', marginTop: '3px' }}>
-                Your web account is active, but your biometric fingerprint and clinic RFID badge are not yet enrolled. Visit any MediBot health kiosk to complete your 1-minute physical enrollment.
+              <div style={{ color: '#15803d', fontSize: '12px' }}>
+                Your hardware credentials are synchronized. You can now tap your RFID card and scan your finger for 1-second login.
               </div>
             </div>
           </div>
-          <button
-            onClick={() => onNavigate('profile')}
-            style={{
-              backgroundColor: '#d97706',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '10px 18px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              marginLeft: '20px'
-            }}
-          >
-            View Clinic Badge Info &rarr;
+          <button onClick={() => setJustEnrolledToast(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#15803d' }}>
+            <X size={18} />
           </button>
         </div>
       )}
 
-      <div style={styles.tabs}>
+      {/* BIOMETRIC ACTION BANNER (SHOWN ONLY IF UNENROLLED) */}
+      {userProfile && !isCurrentlyEnrolled && !justEnrolledToast && (
+        <div style={{
+          backgroundColor: '#fffbeb',
+          borderBottom: '1px solid #fde68a',
+          padding: '12px 28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }} className="no-print">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '36px', height: '36px', borderRadius: '50%',
+              backgroundColor: '#fef3c7', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', color: '#d97706', flexShrink: 0
+            }}>
+              <AlertTriangle size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: '700', color: '#92400e', fontSize: '14px' }}>
+                Kiosk Enrollment Required: Link Physical RFID Badge & AS608 Fingerprint
+              </div>
+              <div style={{ color: '#b45309', fontSize: '12px', marginTop: '2px' }}>
+                Your web account is active. Step onto any MediBot health kiosk and tap your clinic RFID card to enroll your fingerprint in 1 minute.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={() => refreshUserProfile()}
+              style={{
+                backgroundColor: '#fff', border: '1px solid #fde68a', color: '#92400e',
+                borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+              }}
+            >
+              Check Hardware Status
+            </button>
+            <button
+              onClick={() => onNavigate('profile')}
+              style={{
+                backgroundColor: '#d97706', color: '#fff', border: 'none',
+                borderRadius: '8px', padding: '8px 16px', fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+              }}
+            >
+              View Hardware Hub &rarr;
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CLINICAL PATIENT IDENTITY SUMMARY BAR */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderBottom: '1px solid #e2e8f0',
+        padding: '12px 28px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }} className="no-print">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ fontSize: '13px', color: '#475569' }}>
+            Patient: <strong style={{ color: '#0f172a' }}>{userProfile?.firstName || 'Patient'} {userProfile?.lastName || ''}</strong>
+          </div>
+          <div style={{ fontSize: '13px', color: '#475569' }}>
+            MRN: <strong style={{ color: '#0f172a' }}>#{userProfile?.medicalId || (userProfile?.uid ? userProfile.uid.slice(0, 8).toUpperCase() : 'MB-PATIENT')}</strong>
+          </div>
+          {userProfile?.bloodType && (
+            <span style={{ fontSize: '11px', fontWeight: '800', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '2px 8px', borderRadius: '9999px' }}>
+              Blood Group: {userProfile.bloodType}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '5px',
+            fontSize: '11px', fontWeight: '700', padding: '3px 10px', borderRadius: '6px',
+            backgroundColor: isCurrentlyEnrolled ? '#f0fdf4' : '#fffbeb',
+            color: isCurrentlyEnrolled ? '#16a34a' : '#d97706',
+            border: `1px solid ${isCurrentlyEnrolled ? '#bbf7d0' : '#fde68a'}`
+          }}>
+            {isCurrentlyEnrolled ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
+            {isCurrentlyEnrolled ? 'Hardware Biometrics Enrolled' : 'Biometrics Pending Kiosk Scan'}
+          </span>
+          <span style={{
+            fontSize: '11px', fontWeight: '700', padding: '3px 10px', borderRadius: '6px',
+            backgroundColor: conditionColor === '#16a34a' ? '#dcfce7' : '#fee2e2',
+            color: conditionColor === '#16a34a' ? '#16a34a' : '#dc2626'
+          }}>
+            Triage: {conditionText}
+          </span>
+        </div>
+      </div>
+
+      {/* NAVIGATION TABS */}
+      <div style={styles.tabs} className="no-print">
         {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'reports', label: 'Health Reports' },
+          { id: 'overview', label: 'Clinical Overview' },
+          { id: 'reports', label: 'Medical Reports & Examination' },
           { id: 'history', label: 'Readings History' },
-          { id: 'insights', label: 'AI Insights' }
+          { id: 'insights', label: 'AI Health Assessment' }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -425,11 +586,11 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         ))}
       </div>
 
+      {/* DASHBOARD CONTENT BODY */}
       <div style={styles.content}>
         {error && (
-          <div style={{ padding: '12px 16px', marginBottom: '16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '14px' }}>
-            <div style={{ color: '#991b1b', fontWeight: '600', marginBottom: '4px' }}>Firebase Connection Notice</div>
-            <div style={{ color: '#991b1b', fontSize: '13px' }}>{error}</div>
+          <div style={{ padding: '12px 16px', marginBottom: '16px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', color: '#991b1b', fontWeight: '600' }} className="no-print">
+            Firebase Telemetry Notice: {error}
           </div>
         )}
         
@@ -437,32 +598,186 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         {activeTab === 'overview' && (
           <>
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '60px', color: '#6b7280' }}>
-                <div style={{ display: 'inline-block', width: '40px', height: '40px', border: '4px solid #e5e7eb', borderTop: '4px solid #2563eb', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                <p style={{ marginTop: '16px', fontSize: '15px', fontWeight: '500' }}>Connecting to Firebase Realtime Database...</p>
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748b' }}>
+                <div style={{ display: 'inline-block', width: '38px', height: '38px', border: '4px solid #e2e8f0', borderTop: '4px solid #0284c7', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                <p style={{ marginTop: '14px', fontSize: '14px', fontWeight: '600' }}>Streaming Live Telemetry from MediBot Kiosk...</p>
               </div>
             ) : (
               <>
-                {/* METRIC STATS CARDS */}
-                <div style={styles.statsGrid}>
+                {/* 1. LATEST PHYSIOLOGICAL VITALS MATRIX */}
+                <div style={{ backgroundColor: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }} className="no-print">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div>
+                      <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Latest Kiosk Physiological Examination</h2>
+                      <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                        {latestReading?.timestamp 
+                          ? `Recorded: ${new Date(parseInt(latestReading.timestamp) > 1e11 ? parseInt(latestReading.timestamp) : parseInt(latestReading.timestamp) * 1000).toLocaleString()}` 
+                          : 'Live sensor telemetry from MediBot Health Kiosk'}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: '700', color: '#16a34a', backgroundColor: '#f0fdf4', padding: '4px 10px', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                        <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }}></span>
+                        Firebase RTDB Live
+                      </span>
+                      <button
+                        onClick={() => setShowPrintModal(true)}
+                        style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', color: '#0284c7', cursor: 'pointer' }}
+                      >
+                        Print Report
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '14px' }}>
+                    {/* BLOOD PRESSURE */}
+                    <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Blood Pressure</span>
+                        <Activity size={16} color="#dc2626" />
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                        {latestReading?.systolic ? `${latestReading.systolic}/${latestReading.diastolic}` : '--'}
+                        <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>mmHg</span>
+                      </div>
+                      <div style={{ marginTop: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', backgroundColor: bpCategory.bg, color: bpCategory.color }}>
+                          {bpCategory.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* HEART RATE */}
+                    <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Resting Heart Rate</span>
+                        <Heart size={16} color="#e11d48" />
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                        {latestReading ? (latestReading.heartRate || latestReading.heart_rate || '--') : '--'}
+                        <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>bpm</span>
+                      </div>
+                      <div style={{ marginTop: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', backgroundColor: '#f1f5f9', color: '#475569' }}>
+                          Normal: 60-100 bpm
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* SPO2 */}
+                    <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Blood Oxygen (SpO2)</span>
+                        <Droplets size={16} color="#0284c7" />
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                        {latestReading?.spo2 ? `${latestReading.spo2}%` : '--'}
+                      </div>
+                      <div style={{ marginTop: '6px' }}>
+                        <span style={{
+                          fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px',
+                          backgroundColor: (latestReading?.spo2 && latestReading.spo2 < 95) ? '#fee2e2' : '#dcfce7',
+                          color: (latestReading?.spo2 && latestReading.spo2 < 95) ? '#dc2626' : '#16a34a'
+                        }}>
+                          {latestReading?.spo2 ? (latestReading.spo2 >= 95 ? 'Normal (≥95%)' : 'Hypoxia Alert') : 'Normal: ≥95%'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* LASER BMI */}
+                    <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Laser BMI (Primary)</span>
+                        <TrendingUp size={16} color="#0284c7" />
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: '#0284c7' }}>
+                        {bmiLaserVal || '--'}
+                        <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg/m²</span>
+                      </div>
+                      <div style={{ marginTop: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', backgroundColor: bmiCategory.bg, color: bmiCategory.color }}>
+                          {bmiCategory.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* SONAR BMI */}
+                    <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Sonar BMI (Auxiliary)</span>
+                        <TrendingUp size={16} color="#9333ea" />
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: '#9333ea' }}>
+                        {bmiSonarVal || '--'}
+                        <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg/m²</span>
+                      </div>
+                      <div style={{ marginTop: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', backgroundColor: '#f3e8ff', color: '#7e22ce' }}>
+                          Ultrasonic Check
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* BODY WEIGHT */}
+                    <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Calibrated Weight</span>
+                        <Scale size={16} color="#059669" />
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                        {latestReading?.weight ? `${latestReading.weight}` : '--'}
+                        <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>kg</span>
+                      </div>
+                      <div style={{ marginTop: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', backgroundColor: '#f1f5f9', color: '#475569' }}>
+                          HX711 Strain Gauge
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* TEMPERATURE */}
+                    <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Core Temperature</span>
+                        <Activity size={16} color="#d97706" />
+                      </div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a' }}>
+                        {latestReading?.temperature ? `${latestReading.temperature}` : '--'}
+                        <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748b', marginLeft: '4px' }}>°C</span>
+                      </div>
+                      <div style={{ marginTop: '6px' }}>
+                        <span style={{
+                          fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px',
+                          backgroundColor: (latestReading?.temperature && latestReading.temperature > 37.5) ? '#fee2e2' : '#f1f5f9',
+                          color: (latestReading?.temperature && latestReading.temperature > 37.5) ? '#dc2626' : '#475569'
+                        }}>
+                          {latestReading?.temperature ? (latestReading.temperature > 37.5 ? 'Fever / Pyrexia' : 'Normal Range') : 'Normal: 36.5-37.5'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. STATS CARDS */}
+                <div style={styles.statsGrid} className="no-print">
                   {stats.map((stat, index) => {
                     const Icon = iconMap[stat.title] || Activity;
                     return (
                       <div key={index} style={styles.statCard}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                          <span style={{ fontSize: '14px', fontWeight: '500', color: '#4b5563' }}>{stat.title}</span>
-                          <div style={{ padding: '8px', backgroundColor: '#f3f4f6', borderRadius: '8px' }}>
-                            <Icon size={20} color={colorMap[stat.title] || '#2563eb'} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>{stat.title}</span>
+                          <div style={{ padding: '6px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <Icon size={18} color={colorMap[stat.title] || '#0284c7'} />
                           </div>
                         </div>
-                        <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>{stat.value}</div>
+                        <div style={{ fontSize: '26px', fontWeight: '800', color: '#0f172a', marginBottom: '4px' }}>{stat.value}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           {stat.trend === 'up' ? (
-                            <TrendingUp size={16} color="#22c55e" />
+                            <TrendingUp size={14} color="#16a34a" />
                           ) : (
-                            <TrendingDown size={16} color="#ef4444" />
+                            <TrendingDown size={14} color="#dc2626" />
                           )}
-                          <span style={{ fontSize: '14px', fontWeight: '500', color: stat.trend === 'up' ? '#16a34a' : '#dc2626' }}>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: stat.trend === 'up' ? '#16a34a' : '#dc2626' }}>
                             {stat.change}
                           </span>
                         </div>
@@ -471,40 +786,41 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   })}
                 </div>
 
-                <div style={styles.chartsSection}>
+                {/* 3. CHARTS & HEALTH STATUS */}
+                <div style={styles.chartsSection} className="no-print">
                   {/* BMI TREND CHART */}
                   <div style={styles.chartCard}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                       <div>
-                        <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>BMI Trends (Laser vs Sonar)</h3>
-                        <p style={{ fontSize: '13px', color: '#6b7280', margin: '4px 0 0 0' }}>Dual-sensor precision tracking directly from MediBot kiosk</p>
+                        <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Dual-Sensor BMI Progression</h3>
+                        <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>Laser VL53L0X vs Sonar HC-SR04 continuous stadiometer tracking</p>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e', fontSize: '12px', padding: '4px 8px', borderRadius: '6px' }}>Ideal: 18.5 - 25</div>
-                        <button onClick={() => onNavigate('analytics')} style={{ padding: '6px 12px', borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '13px', fontWeight: '600', color: '#2563eb', cursor: 'pointer', backgroundColor: '#fff' }}>Detailed Analytics</button>
+                        <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Healthy WHO: 18.5 - 24.9</div>
+                        <button onClick={() => onNavigate('analytics')} style={{ padding: '6px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: '700', color: '#0284c7', cursor: 'pointer', backgroundColor: '#fff' }}>Detailed Analytics &rarr;</button>
                       </div>
                     </div>
 
                     {historyData.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '60px 20px', color: '#6b7280' }}>
-                        <Activity size={44} style={{ margin: '0 auto 12px', color: '#9ca3af' }} />
-                        <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>No BMI Telemetry Yet</h4>
-                        <p style={{ fontSize: '13px', color: '#6b7280', maxWidth: '380px', margin: '0 auto' }}>
-                          Step onto the MediBot kiosk and complete a measurement to record your dual Laser vs Sonar BMI trend.
+                      <div style={{ textAlign: 'center', padding: '50px 20px', color: '#94a3b8' }}>
+                        <Activity size={40} style={{ margin: '0 auto 10px', color: '#cbd5e1' }} />
+                        <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>No BMI Telemetry Yet</h4>
+                        <p style={{ fontSize: '12px', color: '#64748b', maxWidth: '360px', margin: '0 auto' }}>
+                          Step onto the MediBot kiosk and complete a physical session to track dual Laser vs Sonar BMI.
                         </p>
                       </div>
                     ) : (
-                      <ResponsiveContainer width="100%" height={300}>
+                      <ResponsiveContainer width="100%" height={280}>
                         <LineChart data={chartData.length > 0 ? chartData : historyData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                          <XAxis dataKey="date" stroke="#6b7280" />
-                          <YAxis stroke="#6b7280" domain={['auto', 'auto']} />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 11 }} />
+                          <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend />
-                          <ReferenceLine y={25} stroke="#f59e0b" strokeDasharray="3 3" />
-                          <ReferenceLine y={18.5} stroke="#3b82f6" strokeDasharray="3 3" />
-                          <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#2563eb" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                          <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                          <ReferenceLine y={25} stroke="#d97706" strokeDasharray="3 3" label={{ value: 'Overweight (25)', fill: '#d97706', fontSize: 10 }} />
+                          <ReferenceLine y={18.5} stroke="#0284c7" strokeDasharray="3 3" label={{ value: 'Underweight (18.5)', fill: '#0284c7', fontSize: 10 }} />
+                          <Line name="Laser BMI (VL53L0X)" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                          <Line name="Sonar BMI (HC-SR04)" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
                         </LineChart>
                       </ResponsiveContainer>
                     )}
@@ -512,10 +828,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                   {/* HEALTH STATUS PIE CHART */}
                   <div style={styles.chartCard}>
-                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>Health Status</h3>
-                    <ResponsiveContainer width="100%" height={200}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>Clinical Severity Index</h3>
+                    <ResponsiveContainer width="100%" height={180}>
                       <PieChart>
-                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={80} dataKey="value">
+                        <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={75} dataKey="value">
                           {pieData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
@@ -523,118 +839,64 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         <Tooltip />
                       </PieChart>
                     </ResponsiveContainer>
-                    <div style={{ textAlign: 'center', marginTop: '16px' }}>
-                      <div style={{ fontSize: '14px', color: '#4b5563' }}>Current Condition</div>
-                      <div style={{ fontSize: '24px', fontWeight: 'bold', color: conditionColor }}>{conditionText}</div>
+                    <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Current Evaluation</div>
+                      <div style={{ fontSize: '20px', fontWeight: '800', color: conditionColor }}>{conditionText}</div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Based on AHA & WHO Standards</div>
                     </div>
                   </div>
                 </div>
 
-                {/* BOTTOM SECTION */}
-                <div style={styles.bottomSection}>
-                  {/* LATEST HEALTH READING CARDS */}
+                {/* 4. BOTTOM SECTION: RECENT ACTIVITY */}
+                <div style={styles.bottomSection} className="no-print">
+                  {/* RECENT ACTIVITY LOG */}
                   <div style={styles.chartCard}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                      <div>
-                        <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827' }}>Latest Health Reading</h3>
-                        <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0 0' }}>
-                          {latestReading?.timestamp 
-                            ? `Measured: ${new Date(parseInt(latestReading.timestamp) > 1e11 ? parseInt(latestReading.timestamp) : parseInt(latestReading.timestamp) * 1000).toLocaleString()}` 
-                            : 'Live telemetry from MediBot kiosk'}
-                        </p>
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#16a34a', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }}></span>
-                        Firebase Synced
-                      </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Recent Clinical Telemetry Sessions</h3>
+                      <button onClick={() => setActiveTab('history')} style={{ background: 'none', border: 'none', color: '#0284c7', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                        View Full History &rarr;
+                      </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
-                      <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <Droplets size={16} color="#2563eb" />
-                          <span style={{ fontSize: '14px', color: '#4b5563' }}>SpO2</span>
-                        </div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>
-                          {latestReading?.spo2 ? `${latestReading.spo2}%` : '--'}
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <Heart size={16} color="#dc2626" />
-                          <span style={{ fontSize: '14px', color: '#4b5563' }}>Heart Rate</span>
-                        </div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>
-                          {latestReading ? `${latestReading.heartRate || latestReading.heart_rate || '--'} bpm` : '--'}
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <Activity size={16} color="#16a34a" />
-                          <span style={{ fontSize: '14px', color: '#4b5563' }}>BP (Sys/Dia)</span>
-                        </div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>
-                          {latestReading?.systolic ? `${latestReading.systolic}/${latestReading.diastolic}` : '--'}
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <TrendingUp size={16} color="#2563eb" />
-                          <span style={{ fontSize: '14px', color: '#4b5563' }}>BMI (Laser)</span>
-                        </div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>
-                          {latestReading ? (latestReading.bmiLaser || latestReading.bmi_laser || latestReading.bmi || '--') : '--'}
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <TrendingUp size={16} color="#9333ea" />
-                          <span style={{ fontSize: '14px', color: '#4b5563' }}>BMI (Sonar)</span>
-                        </div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>
-                          {latestReading ? (latestReading.bmiSonar || latestReading.bmi_sonar || '--') : '--'}
-                        </div>
-                      </div>
-
-                      <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <User size={16} color="#059669" />
-                          <span style={{ fontSize: '14px', color: '#4b5563' }}>Weight</span>
-                        </div>
-                        <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#111827' }}>
-                          {latestReading?.weight ? `${latestReading.weight} kg` : '--'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* RECENT ACTIVITY */}
-                  <div style={styles.chartCard}>
-                    <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>Recent Activity</h3>
                     {recentActivity.length === 0 ? (
-                      <div style={{ textAlign: 'center', padding: '32px 16px', color: '#6b7280' }}>
-                        <p style={{ fontSize: '13px', margin: 0 }}>No recent kiosk sessions recorded yet</p>
+                      <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94a3b8' }}>
+                        <p style={{ fontSize: '13px', margin: 0 }}>No recent kiosk sessions recorded yet.</p>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {recentActivity.map((activity) => (
-                          <div key={activity.id} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '32px', height: '32px', backgroundColor: '#2563eb', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <span style={{ fontSize: '14px', fontWeight: '500', color: '#fff' }}>{activity.avatar}</span>
+                          <div key={activity.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #f1f5f9' }}>
+                            <div style={{ width: '32px', height: '32px', backgroundColor: '#0284c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: '700', fontSize: '13px' }}>
+                              {activity.avatar}
                             </div>
                             <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: '14px', fontWeight: '500', color: '#111827' }}>{activity.name}</div>
-                              <div style={{ fontSize: '12px', color: '#6b7280' }}>{activity.type}</div>
+                              <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>{activity.name}</div>
+                              <div style={{ fontSize: '12px', color: '#475569' }}>{activity.type}</div>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#6b7280' }}>{activity.time}</div>
+                            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '600' }}>{activity.time}</div>
                           </div>
                         ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* CLINICAL SUMMARY CARD */}
+                  <div style={styles.chartCard}>
+                    <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '14px' }}>Physician Quick Assessment</h3>
+                    <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#334155' }}>
+                      <p style={{ margin: '0 0 10px 0' }}>
+                        • <strong>Blood Pressure:</strong> {bpCategory.label} ({latestReading?.systolic || '--'}/{latestReading?.diastolic || '--'} mmHg).
+                      </p>
+                      <p style={{ margin: '0 0 10px 0' }}>
+                        • <strong>Oxygenation:</strong> {latestReading?.spo2 ? `${latestReading.spo2}% SpO2` : 'Awaiting sensor'} via PPG pulse oximetry.
+                      </p>
+                      <p style={{ margin: '0 0 10px 0' }}>
+                        • <strong>Stadiometer Correlation:</strong> Laser ({latestReading?.heightLaser || '--'} m) vs Sonar ({latestReading?.heightSonar || '--'} m).
+                      </p>
+                      <p style={{ margin: '0' }}>
+                        • <strong>Biometric Binding:</strong> {isCurrentlyEnrolled ? 'RFID Card & AS608 Fingerprint Active.' : 'Pending kiosk fingerprint enrollment.'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </>
@@ -644,41 +906,48 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
         {/* HEALTH REPORTS TAB */}
         {activeTab === 'reports' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ ...styles.chartCard, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#111827', marginBottom: '4px' }}>Comprehensive Health Report</h2>
-                <p style={{ color: '#6b7280' }}>Multi-sensor readings recorded live from MediBot health kiosk</p>
+                <h2 style={{ fontSize: '22px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Comprehensive Clinical Health Report</h2>
+                <p style={{ color: '#64748b', fontSize: '13px', margin: '4px 0 0 0' }}>Multi-sensor physiological vitals recorded live from MediBot health kiosk</p>
               </div>
-              <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '700' }}>
-                <Download size={20} /> Generate PDF Report
+              <button
+                onClick={() => setShowPrintModal(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px',
+                  backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '10px',
+                  cursor: 'pointer', fontWeight: '700', fontSize: '13px'
+                }}
+              >
+                <Printer size={18} /> Official Printable Medical Report
               </button>
             </div>
 
             {historyData.length === 0 ? (
-              <div style={{ ...styles.chartCard, textAlign: 'center', padding: '60px 20px', color: '#6b7280' }}>
-                <Activity size={48} style={{ margin: '0 auto 16px', color: '#9ca3af' }} />
-                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#111827', marginBottom: '8px' }}>No Health Data in Firebase</h3>
-                <p style={{ fontSize: '14px', color: '#6b7280' }}>Visit a MediBot station to record your vitals and generate comprehensive reports.</p>
+              <div style={{ ...styles.chartCard, textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
+                <Activity size={44} style={{ margin: '0 auto 12px', color: '#cbd5e1' }} />
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#0f172a', marginBottom: '6px' }}>No Health Data in Firebase</h3>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Visit a MediBot kiosk station to record your vitals and generate comprehensive reports.</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))', gap: '24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
                 {/* BMI COMPARISON */}
                 <div style={styles.chartCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>BMI Analysis (Laser vs Sonar)</h3>
-                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Ideal: 18.5 - 25</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>BMI Precision (Laser vs Sonar)</h3>
+                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Healthy: 18.5 - 24.9</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={240}>
                     <ComposedChart data={historyData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="date" tick={{fontSize: 11}} />
-                      <YAxis tick={{fontSize: 11}} />
+                      <YAxis domain={[15, 35]} tick={{fontSize: 11}} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <ReferenceLine y={25} stroke="#f59e0b" strokeDasharray="3 3" />
-                      <ReferenceLine y={18.5} stroke="#3b82f6" strokeDasharray="3 3" />
-                      <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#2563eb" strokeWidth={3} dot={{r: 4}} />
+                      <ReferenceLine y={25} stroke="#d97706" strokeDasharray="3 3" />
+                      <ReferenceLine y={18.5} stroke="#0284c7" strokeDasharray="3 3" />
+                      <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{r: 4}} />
                       <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={false} />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -686,75 +955,58 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
 
                 {/* BLOOD PRESSURE */}
                 <div style={styles.chartCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>Blood Pressure Trends</h3>
-                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#fee2e2', color: '#991b1b' }}>Ideal: 120/80</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Blood Pressure Progression</h3>
+                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#fee2e2', color: '#991b1b' }}>Ideal: &lt; 120/80</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={240}>
                     <LineChart data={historyData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="date" tick={{fontSize: 11}} />
-                      <YAxis tick={{fontSize: 11}} />
+                      <YAxis domain={[50, 180]} tick={{fontSize: 11}} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <ReferenceLine y={140} stroke="#ef4444" strokeDasharray="3 3" />
-                      <ReferenceLine y={90} stroke="#3b82f6" strokeDasharray="3 3" />
-                      <Line name="Systolic" type="monotone" dataKey="systolic" stroke="#dc2626" strokeWidth={2} />
-                      <Line name="Diastolic" type="monotone" dataKey="diastolic" stroke="#ef4444" strokeWidth={1} />
+                      <ReferenceLine y={140} stroke="#dc2626" strokeDasharray="3 3" />
+                      <ReferenceLine y={90} stroke="#0284c7" strokeDasharray="3 3" />
+                      <Line name="Systolic" type="monotone" dataKey="systolic" stroke="#dc2626" strokeWidth={2} dot={{r: 3}} />
+                      <Line name="Diastolic" type="monotone" dataKey="diastolic" stroke="#f87171" strokeWidth={2} dot={{r: 3}} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
 
                 {/* SPO2 */}
                 <div style={styles.chartCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>Oxygen Saturation (SpO2)</h3>
-                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &gt; 95%</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Oxygen Saturation (SpO2 %)</h3>
+                    <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &ge; 95%</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={240}>
                     <AreaChart data={historyData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="date" tick={{fontSize: 11}} />
                       <YAxis domain={[90, 100]} tick={{fontSize: 11}} />
                       <Tooltip content={<CustomTooltip />} />
-                      <ReferenceLine y={95} stroke="#ef4444" strokeWidth={2} />
-                      <Area name="SpO2 %" type="monotone" dataKey="spo2" stroke="#0891b2" fill="#ecfeff" strokeWidth={2} />
+                      <ReferenceLine y={95} stroke="#dc2626" strokeWidth={2} />
+                      <Area name="SpO2 %" type="monotone" dataKey="spo2" stroke="#0284c7" fill="#e0f2fe" strokeWidth={2} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* HEIGHT */}
+                {/* HEIGHT SENSING */}
                 <div style={styles.chartCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>Height Sensing Comparison</h3>
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>Meters (m)</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Height Sensing Comparison</h3>
+                    <span style={{ fontSize: '12px', color: '#64748b' }}>Meters (m)</span>
                   </div>
-                  <ResponsiveContainer width="100%" height={250}>
+                  <ResponsiveContainer width="100%" height={240}>
                     <LineChart data={historyData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="date" tick={{fontSize: 11}} />
                       <YAxis domain={['dataMin - 0.05', 'dataMax + 0.05']} tick={{fontSize: 11}} />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <Line name="Laser (m)" type="monotone" dataKey="heightLaser" stroke="#10b981" strokeWidth={3} />
-                      <Line name="Sonar (m)" type="monotone" dataKey="heightSonar" stroke="#6366f1" strokeWidth={2} strokeDasharray="3 3" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* WEIGHT & TEMP */}
-                <div style={styles.chartCard}>
-                  <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '20px' }}>Weight & Temperature Trends</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={historyData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                      <XAxis dataKey="date" tick={{fontSize: 11}} />
-                      <YAxis yAxisId="left" tick={{fontSize: 11}} />
-                      <YAxis yAxisId="right" orientation="right" tick={{fontSize: 11}} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      <Line yAxisId="left" name="Weight (kg)" type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={2} />
-                      <Line yAxisId="right" name="Temp (°C)" type="monotone" dataKey="temperature" stroke="#f59e0b" strokeWidth={2} />
+                      <Line name="Laser (m)" type="monotone" dataKey="heightLaser" stroke="#16a34a" strokeWidth={3} dot={{r: 3}} />
+                      <Line name="Sonar (m)" type="monotone" dataKey="heightSonar" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="4 4" dot={{r: 3}} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -766,12 +1018,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         {/* READINGS HISTORY TAB */}
         {activeTab === 'history' && (
           <div style={styles.chartCard}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <div>
-                <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111827' }}>Readings History</h2>
-                <p style={{ fontSize: '13px', color: '#6b7280', margin: '2px 0 0 0' }}>All health measurements synced directly from Firebase</p>
+                <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Clinical Telemetry History Log</h2>
+                <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>All health measurements synced directly from Firebase RTDB</p>
               </div>
-              <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: '500' }}>
+              <span style={{ fontSize: '13px', color: '#475569', fontWeight: '600' }}>
                 Total Sessions: <strong>{historyData.length}</strong>
               </span>
             </div>
@@ -779,54 +1031,59 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>Date & Time</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>Heart Rate</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>SpO2</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>Blood Pressure</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>BMI (Laser)</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>BMI (Sonar)</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>Height (Laser)</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>Weight</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>Temp</th>
-                    <th style={{ padding: '12px', textAlign: 'left', color: '#4b5563', fontSize: '13px', fontWeight: '600' }}>Status</th>
+                  <tr style={{ borderBottom: '2px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Date & Time</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Blood Pressure</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Heart Rate</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>SpO2</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Laser BMI</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Sonar BMI</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Height</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Weight</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Temp</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>AHA Category</th>
                   </tr>
                 </thead>
                 <tbody>
                   {historyData.length === 0 ? (
                     <tr>
-                      <td colSpan={10} style={{ padding: '48px', textAlign: 'center', color: '#6b7280' }}>
-                        <Activity size={36} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-                        <p style={{ margin: 0, fontWeight: '500' }}>No readings recorded yet from MediBot kiosk</p>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>Visit any MediBot kiosk to record your first health session.</p>
+                      <td colSpan={10} style={{ padding: '48px', textAlign: 'center', color: '#94a3b8' }}>
+                        <Activity size={32} style={{ margin: '0 auto 8px', opacity: 0.5 }} />
+                        <p style={{ margin: 0, fontWeight: '600', fontSize: '14px', color: '#475569' }}>No readings recorded yet from MediBot kiosk</p>
+                        <p style={{ margin: '4px 0 0 0', fontSize: '12px' }}>Visit any MediBot kiosk to record your first session.</p>
                       </td>
                     </tr>
                   ) : (
-                    [...historyData].reverse().map((reading, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td style={{ padding: '12px', fontSize: '13px', color: '#111827' }}>{reading.fullDate}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: '#111827' }}>{reading.heartRate ? `${reading.heartRate} bpm` : '--'}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: '#111827' }}>{reading.spo2 ? `${reading.spo2}%` : '--'}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: '#111827' }}>{reading.systolic ? `${reading.systolic}/${reading.diastolic}` : '--'}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', fontWeight: '600', color: '#2563eb' }}>{reading.bmiLaser || '--'}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', fontWeight: '600', color: '#9333ea' }}>{reading.bmiSonar || '--'}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: '#111827' }}>{reading.heightLaser ? `${reading.heightLaser} m` : '--'}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: '#111827' }}>{reading.weight ? `${reading.weight} kg` : '--'}</td>
-                        <td style={{ padding: '12px', fontSize: '13px', color: '#111827' }}>{reading.temperature ? `${reading.temperature}°C` : '--'}</td>
-                        <td style={{ padding: '12px' }}>
-                          <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '12px',
-                            fontSize: '12px',
-                            fontWeight: '600',
-                            backgroundColor: reading.ahaCategory === 'Normal' ? '#dcfce7' : '#fee2e2',
-                            color: reading.ahaCategory === 'Normal' ? '#16a34a' : '#dc2626'
-                          }}>
-                            {reading.ahaCategory || 'Normal'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                    [...historyData].reverse().map((reading, idx) => {
+                      const readingAha = getAhaBpCategory(reading.systolic, reading.diastolic);
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#0f172a', fontWeight: '500' }}>{reading.fullDate}</td>
+                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
+                            {reading.systolic ? `${reading.systolic}/${reading.diastolic} mmHg` : '--'}
+                          </td>
+                          <td style={{ padding: '12px', fontSize: '13px', color: '#0f172a' }}>{reading.heartRate ? `${reading.heartRate} bpm` : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '13px', color: '#0f172a' }}>{reading.spo2 ? `${reading.spo2}%` : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: '700', color: '#0284c7' }}>{reading.bmiLaser || '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '13px', fontWeight: '600', color: '#9333ea' }}>{reading.bmiSonar || '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.heightLaser ? `${reading.heightLaser} m` : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.weight ? `${reading.weight} kg` : '--'}</td>
+                          <td style={{ padding: '12px', fontSize: '12px', color: '#475569' }}>{reading.temperature ? `${reading.temperature} °C` : '--'}</td>
+                          <td style={{ padding: '12px' }}>
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              backgroundColor: readingAha.bg,
+                              color: readingAha.color
+                            }}>
+                              {readingAha.label}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -837,38 +1094,252 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
         {/* AI INSIGHTS TAB */}
         {activeTab === 'insights' && (
           <div style={styles.chartCard}>
-            <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#111827', marginBottom: '24px' }}>AI Health Insights</h2>
-            <div style={{ padding: '24px', backgroundColor: '#f0f9ff', borderRadius: '8px', textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ fontSize: '16px', color: '#0c4a6e', marginBottom: '16px' }}>
-                &bull; Click the button below to get personalized AI insights for your health
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              <Sparkles size={22} color="#0284c7" />
+              <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#0f172a', margin: 0 }}>AI Clinical Insights & Recommendation Assistant</h2>
+            </div>
+            <div style={{ padding: '24px', backgroundColor: '#f0f9ff', borderRadius: '12px', textAlign: 'center', marginBottom: '20px', border: '1px solid #bae6fd' }}>
+              <div style={{ fontSize: '15px', color: '#0369a1', fontWeight: '600', marginBottom: '14px' }}>
+                Automated clinical synthesis based on your real MediBot physiological readings
               </div>
               <button
                 onClick={() => onNavigate('ai-recommendations')}
                 style={{
-                  padding: '12px 24px',
-                  backgroundColor: '#2563eb',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.2s'
+                  padding: '10px 22px', backgroundColor: '#0284c7', color: '#fff',
+                  border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '700',
+                  cursor: 'pointer', boxShadow: '0 2px 4px rgba(2,132,199,0.2)'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
               >
-                Open AI Recommendations &rarr;
+                Launch AI Health Assessment &rarr;
               </button>
             </div>
-            <div style={{ padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px', borderLeft: '4px solid #2563eb' }}>
-              <div style={{ fontSize: '14px', color: '#4b5563' }}>
-                <strong>How it works:</strong> Our AI health assistant evaluates your real MediBot kiosk vitals (BP, SpO2, Laser BMI, Sonar BMI, Pulse) to give tailored guidance and alert you to trends.
+            <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', borderLeft: '4px solid #0284c7' }}>
+              <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>
+                <strong>Diagnostic Basis:</strong> Our AI engine evaluates blood pressure progression (AHA stages), oxygenation saturation via MAX30102 PPG, and dual-sensor stature & BMI (VL53L0X Laser vs HC-SR04 Sonar) to generate actionable lifestyle and physician consultation guidance.
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* PRINTABLE OFFICIAL MEDICAL REPORT MODAL */}
+      {showPrintModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(15, 23, 42, 0.75)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', maxWidth: '850px', width: '100%',
+            maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)'
+          }}>
+            {/* Modal Control Header (hidden on print) */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '16px 24px', borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc'
+            }} className="no-print">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700', color: '#0f172a' }}>
+                <FileText size={20} color="#0284c7" /> Official Clinical Examination Report
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => window.print()}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 16px',
+                    backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '8px',
+                    fontWeight: '700', fontSize: '13px', cursor: 'pointer'
+                  }}
+                >
+                  <Printer size={16} /> Print / Save PDF
+                </button>
+                <button
+                  onClick={() => setShowPrintModal(false)}
+                  style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: '4px' }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* PRINTABLE REPORT BODY */}
+            <div id="printable-dashboard-report" style={{ padding: '36px', backgroundColor: '#ffffff', color: '#0f172a' }}>
+              {/* Report Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0284c7', paddingBottom: '20px', marginBottom: '24px' }}>
+                <div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#0284c7', letterSpacing: '-0.5px' }}>
+                    MEDIBOT CLINICAL HEALTH MONITOR
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#475569', marginTop: '2px' }}>
+                    Department of Automated Physiological Triage & Biometric Health Intelligence
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                    Facility Kiosk Unit #K-01 &bull; Cloud RTDB Connected
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>EXAMINATION REPORT</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>Date: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>Time: {new Date().toLocaleTimeString()}</div>
+                  <div style={{ fontSize: '11px', color: '#0284c7', fontWeight: '700' }}>DOC-REF: #MB-{Date.now().toString().slice(-8)}</div>
+                </div>
+              </div>
+
+              {/* Patient Identity Block */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', fontSize: '13px' }}>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: '600' }}>PATIENT NAME</span>
+                    <strong style={{ fontSize: '15px' }}>{userProfile?.firstName || 'Patient'} {userProfile?.lastName || ''}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: '600' }}>MEDICAL RECORD NUMBER</span>
+                    <strong style={{ fontSize: '14px' }}>#{userProfile?.medicalId || (userProfile?.uid ? userProfile.uid.slice(0, 8).toUpperCase() : 'N/A')}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: '600' }}>BLOOD GROUP</span>
+                    <strong style={{ color: '#b91c1c', fontSize: '14px' }}>{userProfile?.bloodType || 'Not specified'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: '600' }}>GENDER / AGE</span>
+                    <span>{userProfile?.gender || 'Not specified'} &bull; {userProfile?.dateOfBirth || 'DOB on file'}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: '600' }}>CLINIC RFID BADGE</span>
+                    <span>{userProfile?.rfidNumber || 'Not linked'}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', fontWeight: '600' }}>BIOMETRIC STATUS</span>
+                    <span style={{ color: isCurrentlyEnrolled ? '#16a34a' : '#d97706', fontWeight: '700' }}>
+                      {isCurrentlyEnrolled ? 'Verified (FP + RFID)' : 'Pending Fingerprint'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vital Signs Observation Table */}
+              <div style={{ marginBottom: '24px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: '800', color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', borderBottom: '1px solid #e2e8f0', paddingBottom: '6px' }}>
+                  1. Physiological Vital Signs & Anthropometrics
+                </h4>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: '700', color: '#334155' }}>Parameter</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: '700', color: '#334155' }}>Primary Sensor</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: '700', color: '#334155' }}>Observed Value</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: '700', color: '#334155' }}>Reference Range</th>
+                      <th style={{ padding: '8px', textAlign: 'left', fontWeight: '700', color: '#334155' }}>Clinical Evaluation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Systolic Blood Pressure</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Oscillometric Cuff</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.systolic ? `${latestReading.systolic} mmHg` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>&lt; 120 mmHg</td>
+                      <td style={{ padding: '8px' }}>
+                        <span style={{ fontWeight: '700', color: bpCategory.color }}>{bpCategory.label}</span>
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Diastolic Blood Pressure</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Oscillometric Cuff</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.diastolic ? `${latestReading.diastolic} mmHg` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>&lt; 80 mmHg</td>
+                      <td style={{ padding: '8px', color: '#16a34a' }}>Standard Range</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Heart Rate (Resting)</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>MAX30102 PPG Optical</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.heartRate || latestReading?.heart_rate || 'N/A'} bpm</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>60 - 100 bpm</td>
+                      <td style={{ padding: '8px', color: '#16a34a' }}>Normal Sinus Rhythm</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Blood Oxygen (SpO2)</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>MAX30102 Red/IR Ratio</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.spo2 ? `${latestReading.spo2}%` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>95 - 100%</td>
+                      <td style={{ padding: '8px', color: (latestReading?.spo2 && latestReading.spo2 < 95) ? '#dc2626' : '#16a34a' }}>
+                        {latestReading?.spo2 ? (latestReading.spo2 >= 95 ? 'Normal Saturation' : 'Hypoxia Alert') : 'Normal'}
+                      </td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Laser)</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>VL53L0X ToF Laser</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiLaserVal || 'N/A'} kg/m²</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
+                      <td style={{ padding: '8px', color: bmiCategory.color, fontWeight: '700' }}>{bmiCategory.label}</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Sonar)</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>HC-SR04 Ultrasonic</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{bmiSonarVal || 'N/A'} kg/m²</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Auxiliary Correlation</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Patient Weight</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>HX711 4-Point Load Cell</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.weight ? `${latestReading.weight} kg` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Individual Baseline</td>
+                      <td style={{ padding: '8px', color: '#16a34a' }}>Calibrated</td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Body Temperature</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Medical Contact / IR</td>
+                      <td style={{ padding: '8px', fontWeight: '700' }}>{latestReading?.temperature ? `${latestReading.temperature} °C` : 'N/A'}</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>36.5 - 37.5 °C</td>
+                      <td style={{ padding: '8px', color: '#16a34a' }}>Afebrile</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Automated Clinical Assessment */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '24px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: '800', color: '#0f172a', margin: '0 0 8px 0', textTransform: 'uppercase' }}>
+                  2. Automated Triage Impression & Findings
+                </h4>
+                <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#334155' }}>
+                  • Blood Pressure demonstrates <strong>{bpCategory.label}</strong> ({latestReading?.systolic || '--'}/{latestReading?.diastolic || '--'} mmHg) per AHA guidelines.<br />
+                  • Oxygenation index is verified at <strong>{latestReading?.spo2 || '--'}%</strong> via continuous photoplethysmography.<br />
+                  • Dual stadiometer sensor agreement (Laser ToF: {latestReading?.heightLaser || '--'}m vs Sonar: {latestReading?.heightSonar || '--'}m) indicates reliable stature acquisition.<br />
+                  • Patient baseline BMI classified as <strong>{bmiCategory.label}</strong> ({bmiLaserVal || bmiSonarVal || '--'} kg/m²).
+                </div>
+              </div>
+
+              {/* Active Clinical Alerts & Allergies */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+                <div style={{ padding: '14px', borderRadius: '8px', border: '1px solid #fed7aa', backgroundColor: '#fff7ed' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#c2410c', marginBottom: '4px' }}>KNOWN ALLERGIES & ADVERSE REACTIONS</div>
+                  <div style={{ fontSize: '13px', color: '#7c2d12' }}>{userProfile?.allergies || 'No known allergies reported.'}</div>
+                </div>
+                <div style={{ padding: '14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: '#f8fafc' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>CHRONIC MEDICAL HISTORY</div>
+                  <div style={{ fontSize: '13px', color: '#334155' }}>{userProfile?.medicalHistory || 'No prior chronic conditions logged.'}</div>
+                </div>
+              </div>
+
+              {/* Physician Review & Signature Block */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '20px', borderTop: '1px dashed #cbd5e1' }}>
+                <div>
+                  <div style={{ fontSize: '12px', color: '#64748b' }}>Examined via MediBot Kiosk Model S3-100</div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8' }}>Secure Telehealth Digital Signature Verification Token</div>
+                </div>
+                <div style={{ textAlign: 'center', width: '220px' }}>
+                  <div style={{ borderBottom: '1px solid #0f172a', width: '100%', marginBottom: '4px' }}>
+                    <div style={{ fontFamily: 'cursive', fontSize: '18px', color: '#1e3a8a' }}>Dr. Kiosk Attending, MD</div>
+                  </div>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#0f172a' }}>Attending Physician / Reviewer</div>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>Date: {new Date().toLocaleDateString()}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

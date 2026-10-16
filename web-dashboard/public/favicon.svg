@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="medGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+  </defs>
+  <!-- Rounded Shield / Base -->
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#medGrad)" />
+  <!-- Medical Cross Background -->
+  <path d="M26 14 h12 v12 h12 v12 h-12 v12 h-12 v-12 h-12 v-12 h12 z" fill="#ffffff" fill-opacity="0.18" />
+  <!-- Dynamic ECG Heartbeat Pulse Line -->
+  <path d="M10 34 L22 34 L26 22 L31 46 L37 26 L41 38 L45 34 L54 34" 
+        fill="none" 
+        stroke="#ffffff" 
+        stroke-width="4" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" />
+  <!-- Pulse Node Dot -->
+  <circle cx="31" cy="46" r="2.5" fill="#38bdf8" />
+</svg>
