@@ -798,8 +798,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 </div>
 
                 {/* 3. CHARTS & HEALTH STATUS */}
-                <div style={styles.chartsSection} className="no-print">
-                  {/* BMI TREND CHART */}
+                {/* 3. FULL-WIDTH BMI PROGRESSION GRAPH EXTENDING ACROSS THE SCREEN */}
+                <div style={{ marginBottom: '24px', width: '100%' }} className="no-print">
                   <div style={styles.chartCard}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                       <div>
@@ -821,7 +821,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         </p>
                       </div>
                     ) : (
-                      <ResponsiveContainer width="100%" height={290}>
+                      <ResponsiveContainer width="100%" height={350}>
                         <ComposedChart data={chartData.length > 0 ? chartData : historyData}>
                           <defs>
                             <linearGradient id="dashLaserBmiGrad" x1="0" y1="0" x2="0" y2="1">
@@ -846,7 +846,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       </ResponsiveContainer>
                     )}
                   </div>
+                </div>
 
+                {/* 4. CLINICAL SEVERITY, RECENT SESSIONS & PHYSICIAN ASSESSMENT */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }} className="no-print">
                   {/* HEALTH STATUS PIE CHART */}
                   <div style={styles.chartCard}>
                     <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', marginBottom: '16px' }}>Clinical Severity Index</h3>
@@ -866,10 +869,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>Based on AHA & WHO Standards</div>
                     </div>
                   </div>
-                </div>
 
-                {/* 4. BOTTOM SECTION: RECENT ACTIVITY */}
-                <div style={styles.bottomSection} className="no-print">
                   {/* RECENT ACTIVITY LOG */}
                   <div style={styles.chartCard}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -952,14 +952,14 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 <p style={{ fontSize: '13px', color: '#64748b', margin: 0 }}>Visit a MediBot kiosk station to record your vitals and generate comprehensive reports.</p>
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', width: '100%' }}>
                 {/* BMI COMPARISON */}
-                <div style={styles.chartCard}>
+                <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Stature & Adiposity Progression</h3>
                     <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Healthy: 18.5 - 24.9</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={260}>
+                  <ResponsiveContainer width="100%" height={340}>
                     <ComposedChart data={historyData}>
                       <defs>
                         <linearGradient id="repLaserBmiGrad" x1="0" y1="0" x2="0" y2="1">
@@ -984,12 +984,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 </div>
 
                 {/* BLOOD PRESSURE */}
-                <div style={styles.chartCard}>
+                <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Blood Pressure Progression</h3>
                     <div style={{ ...styles.thresholdLabel, backgroundColor: '#fee2e2', color: '#991b1b' }}>Ideal: &lt; 120/80</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={260}>
+                  <ResponsiveContainer width="100%" height={340}>
                     <ComposedChart data={historyData}>
                       <defs>
                         <linearGradient id="repBpPulseGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1015,12 +1015,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 </div>
 
                 {/* SPO2 */}
-                <div style={styles.chartCard}>
+                <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Oxygen Saturation (SpO2 %)</h3>
                     <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &ge; 95%</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={260}>
+                  <ResponsiveContainer width="100%" height={340}>
                     <AreaChart data={historyData}>
                       <defs>
                         <linearGradient id="repSpo2Grad" x1="0" y1="0" x2="0" y2="1">
@@ -1041,12 +1041,12 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 </div>
 
                 {/* HEIGHT SENSING */}
-                <div style={styles.chartCard}>
+                <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Height Sensing Comparison</h3>
                     <span style={{ fontSize: '12px', color: '#64748b' }}>Meters (m)</span>
                   </div>
-                  <ResponsiveContainer width="100%" height={260}>
+                  <ResponsiveContainer width="100%" height={340}>
                     <LineChart data={historyData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                       <XAxis dataKey="date" tick={{fontSize: 11}} stroke="#64748b" />

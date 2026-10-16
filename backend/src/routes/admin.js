@@ -21,20 +21,40 @@ router.get('/patients', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const usersSnapshot = await db.ref('USERS').once('value');
     const users = usersSnapshot.val() || {};
+    const rfidMappingSnapshot = await db.ref('RFID_MAPPING').once('value');
+    const rfidMapping = rfidMappingSnapshot.val() || {};
     
     const patients = [];
+    const seenUids = new Set();
+
     for (const [uid, userData] of Object.entries(users)) {
-      const profile = userData.profile || {};
+      if (!userData || typeof userData !== 'object') continue;
+      
+      // If this entry is an RFID-keyed duplicate of another mapped user, skip
+      if (userData.rfid && rfidMapping[userData.rfid]?.userId && rfidMapping[userData.rfid]?.userId !== uid) {
+        continue;
+      }
+
+      const profile = userData.profile || userData;
+      const rfidNumber = profile.rfidNumber || profile.rfid || (rfidMapping[uid]?.userId ? uid : 'Not assigned');
+      const firstName = profile.firstName || profile.first_name || (profile.name ? profile.name.split(' ')[0] : 'Patient');
+      const lastName = profile.lastName || profile.last_name || (profile.name ? profile.name.split(' ').slice(1).join(' ') : (uid.length > 8 ? uid.slice(0, 6) : uid));
+      const medicalId = profile.medicalId || profile.medical_id || undefined;
+      const bloodType = profile.bloodType || undefined;
+
+      seenUids.add(uid);
       patients.push({
         uid,
-        email: profile.email,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        rfidNumber: profile.rfidNumber || 'Not assigned',
-        dateOfBirth: profile.dateOfBirth,
-        gender: profile.gender,
-        phone: profile.phone,
-        createdAt: profile.createdAt
+        email: profile.email || '',
+        firstName,
+        lastName,
+        rfidNumber,
+        dateOfBirth: profile.dateOfBirth || '',
+        gender: profile.gender || '',
+        phone: profile.phone || '',
+        medicalId,
+        bloodType,
+        createdAt: profile.createdAt || profile.linkedAt || Date.now()
       });
     }
     
@@ -116,23 +136,71 @@ router.get('/patients/:uid', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { uid } = req.params;
     
-    const profileSnapshot = await db.ref(`USERS/${uid}/profile`).once('value');
-    const medicationsSnapshot = await db.ref(`USERS/${uid}/medications`).once('value');
-    
-    if (!profileSnapshot.exists()) {
+    let resolvedUid = uid;
+    let userSnapshot = await db.ref(`USERS/${uid}`).once('value');
+    let userData = userSnapshot.exists() ? userSnapshot.val() : null;
+
+    // Check RFID_MAPPING if not directly found
+    if (!userData) {
+      const rfidMappingSnapshot = await db.ref(`RFID_MAPPING/${uid}`).once('value');
+      if (rfidMappingSnapshot.exists()) {
+        resolvedUid = rfidMappingSnapshot.val().userId;
+        userSnapshot = await db.ref(`USERS/${resolvedUid}`).once('value');
+        if (userSnapshot.exists()) userData = userSnapshot.val();
+      }
+    }
+
+    // Check global USERS search if still not found
+    if (!userData) {
+      const allUsersSnapshot = await db.ref('USERS').once('value');
+      if (allUsersSnapshot.exists()) {
+        const allUsers = allUsersSnapshot.val();
+        for (const [key, val] of Object.entries(allUsers)) {
+          const u = val;
+          if (key === uid || u?.profile?.rfidNumber === uid || u?.rfid === uid || u?.medicalId === uid || u?.profile?.medicalId === uid) {
+            resolvedUid = key;
+            userData = u;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!userData) {
       return res.status(404).json({ error: 'Patient not found' });
     }
-    
-    const profile = profileSnapshot.val();
+
+    const rawProfile = userData.profile || userData;
+    const rfid = rawProfile.rfidNumber || rawProfile.rfid || (uid.length <= 16 && /^[A-Fa-f0-9]+$/.test(uid) ? uid : '');
+    const profile = {
+      firstName: rawProfile.firstName || rawProfile.first_name || (rawProfile.name ? rawProfile.name.split(' ')[0] : 'Patient'),
+      lastName: rawProfile.lastName || rawProfile.last_name || (rawProfile.name ? rawProfile.name.split(' ').slice(1).join(' ') : 'Record'),
+      email: rawProfile.email || '',
+      phone: rawProfile.phone || '',
+      gender: rawProfile.gender || 'Not specified',
+      dateOfBirth: rawProfile.dateOfBirth || '',
+      bloodType: rawProfile.bloodType || '',
+      medicalId: rawProfile.medicalId || rawProfile.medical_id || ('MB-' + resolvedUid.slice(0, 6).toUpperCase()),
+      rfidNumber: rfid || 'Not assigned',
+      biometric_enrolled: Boolean(userData.biometric_enrolled || rawProfile.biometric_enrolled || userData.fingerprint_registered || rawProfile.fingerprint_registered),
+      fingerprint_registered: Boolean(userData.fingerprint_registered || rawProfile.fingerprint_registered),
+      createdAt: rawProfile.createdAt || rawProfile.linkedAt || Date.now()
+    };
+
+    const medicationsSnapshot = await db.ref(`USERS/${resolvedUid}/medications`).once('value');
     const medications = medicationsSnapshot.val() || {};
-    
-    // Get latest reading if RFID is assigned
+
+    // Get latest reading
     let latestReading = null;
-    if (profile.rfidNumber) {
-      const readingSnapshot = await db.ref(`READINGS/${profile.rfidNumber}/latest`).once('value');
+    if (rfid && rfid !== 'Not assigned') {
+      const readingSnapshot = await db.ref(`READINGS/${rfid}/latest`).once('value');
       latestReading = readingSnapshot.val();
     }
-    
+    if (!latestReading) {
+      const globalSnapshot = await db.ref('READINGS/latest').once('value');
+      latestReading = globalSnapshot.val();
+    }
+
     res.json({
       profile,
       medications,

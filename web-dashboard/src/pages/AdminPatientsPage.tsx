@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  ArrowLeft, Search, Users, UserCheck, UserX, Eye, Download, 
+  ArrowLeft, Search, Users, UserCheck, UserX, Download, 
   Activity, Heart, Droplets, ShieldCheck, UserPlus, CreditCard, 
-  Sparkles, X
+  Sparkles, X, LayoutDashboard, FileText
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import { database } from '../context/AuthContext';
@@ -337,6 +337,12 @@ const AdminPatientsPage: React.FC<AdminPatientsPageProps> = ({ onBack }) => {
     table: { width: '100%', borderCollapse: 'collapse' as const },
     th: { padding: '12px 14px', textAlign: 'left' as const, borderBottom: '2px solid #e2e8f0', fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase' as const, letterSpacing: '0.5px' },
     td: { padding: '14px', borderBottom: '1px solid #f1f5f9', fontSize: '13px', color: '#0f172a' },
+    dashboardBtn: { 
+      backgroundColor: '#0284c7', border: '1px solid #0284c7', cursor: 'pointer', 
+      color: '#fff', padding: '6px 12px', fontSize: '12px', fontWeight: '700',
+      borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '5px',
+      boxShadow: '0 1px 3px rgba(2, 132, 199, 0.25)', whiteSpace: 'nowrap' as const
+    },
     actionBtn: { 
       backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', cursor: 'pointer', 
       color: '#0284c7', padding: '6px 10px', fontSize: '12px', fontWeight: '700',
@@ -566,13 +572,21 @@ const AdminPatientsPage: React.FC<AdminPatientsPageProps> = ({ onBack }) => {
                       </td>
 
                       <td style={styles.td}>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'nowrap' }}>
                           <button
                             onClick={() => handleViewPatient(patient.uid)}
-                            style={styles.actionBtn}
-                            title="View Clinical Report"
+                            style={styles.dashboardBtn}
+                            title="View Patient Clinical Dashboard & Full Telemetry"
                           >
-                            <Eye size={13} />
+                            <LayoutDashboard size={13} />
+                            View Dashboard
+                          </button>
+                          <button
+                            onClick={() => navigate(`/dashboard/admin-patient-detail/${patient.uid}?report=open`)}
+                            style={styles.actionBtn}
+                            title="View Official Medical Report"
+                          >
+                            <FileText size={13} />
                             Report
                           </button>
                           <button

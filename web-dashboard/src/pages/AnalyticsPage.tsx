@@ -120,7 +120,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
       backgroundColor: active ? '#2563eb' : 'transparent', color: active ? '#fff' : '#6b7280',
       transition: 'all 0.2s'
     }),
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(500px, 1fr))', gap: '24px' },
+    grid: { display: 'flex', flexDirection: 'column' as const, gap: '24px', width: '100%' },
     card: { backgroundColor: '#fff', padding: '24px', borderRadius: '16px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' },
     cardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' },
     cardTitle: { fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '4px' },
@@ -187,7 +187,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
       ) : (
         <div style={styles.grid}>
           {/* BMI COMPARISON */}
-          <div style={styles.card}>
+          <div style={{ ...styles.card, width: '100%', boxSizing: 'border-box' }}>
             <div style={styles.cardHeader}>
               <div>
                 <h3 style={styles.cardTitle}>BMI & Adiposity Analysis</h3>
@@ -195,7 +195,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
               </div>
               <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>WHO Normal: 18.5 - 24.9</div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={340}>
               <ComposedChart data={historyData}>
                 <defs>
                   <linearGradient id="anBmiArea" x1="0" y1="0" x2="0" y2="1">
@@ -221,7 +221,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           </div>
 
           {/* BLOOD PRESSURE */}
-          <div style={styles.card}>
+          <div style={{ ...styles.card, width: '100%', boxSizing: 'border-box' }}>
             <div style={styles.cardHeader}>
               <div>
                 <h3 style={styles.cardTitle}>Hemodynamic Blood Pressure</h3>
@@ -229,7 +229,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
               </div>
               <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &lt; 120/80 mmHg</div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={340}>
               <ComposedChart data={historyData}>
                 <defs>
                   <linearGradient id="anBpPulseGrad" x1="0" y1="0" x2="0" y2="1">
@@ -255,7 +255,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           </div>
 
           {/* SPO2 */}
-          <div style={styles.card}>
+          <div style={{ ...styles.card, width: '100%', boxSizing: 'border-box' }}>
             <div style={styles.cardHeader}>
               <div>
                 <h3 style={styles.cardTitle}>Oxygen Saturation (SpO2)</h3>
@@ -263,7 +263,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
               </div>
               <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &gt; 95%</div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={340}>
               <AreaChart data={historyData}>
                 <defs>
                   <linearGradient id="anColorSpo2" x1="0" y1="0" x2="0" y2="1">
@@ -283,7 +283,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           </div>
 
           {/* HEIGHT COMPARISON */}
-          <div style={styles.card}>
+          <div style={{ ...styles.card, width: '100%', boxSizing: 'border-box' }}>
             <div style={styles.cardHeader}>
               <div>
                 <h3 style={styles.cardTitle}>Stature Measurement (Meters)</h3>
@@ -291,7 +291,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
               </div>
               <div style={{ ...styles.thresholdLabel, backgroundColor: '#f3f4f6', color: '#374151' }}>Unit: Meters</div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={340}>
               <LineChart data={historyData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
@@ -305,7 +305,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           </div>
 
           {/* WEIGHT & TEMPERATURE */}
-          <div style={styles.card}>
+          <div style={{ ...styles.card, width: '100%', boxSizing: 'border-box' }}>
             <div style={styles.cardHeader}>
               <div>
                 <h3 style={styles.cardTitle}>Weight & Body Temp</h3>
@@ -315,7 +315,7 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
                 <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Temp: 36.1 - 37.2°C</div>
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={300}>
+            <ResponsiveContainer width="100%" height={340}>
               <LineChart data={historyData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
@@ -330,10 +330,10 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           </div>
 
           {/* SUMMARY STATS CARD */}
-          <div style={{ ...styles.card, backgroundColor: '#2563eb', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
+          <div style={{ ...styles.card, width: '100%', boxSizing: 'border-box', backgroundColor: '#2563eb', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
             <Activity size={48} style={{ marginBottom: '16px' }} />
             <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '8px' }}>Health Progress Report</h3>
-            <p style={{ opacity: 0.9, maxWidth: '300px', marginBottom: '24px' }}>Download your detailed health analysis and historical data.</p>
+            <p style={{ opacity: 0.9, maxWidth: '400px', marginBottom: '24px' }}>Download your detailed health analysis and historical data.</p>
             <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', backgroundColor: '#fff', color: '#2563eb', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '16px' }}>
               <Download size={20} />
               Generate Report

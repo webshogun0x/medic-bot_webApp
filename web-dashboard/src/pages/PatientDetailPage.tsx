@@ -3,7 +3,7 @@ import {
   ArrowLeft, Activity, Droplets, Phone, Mail, 
   Download, AlertTriangle, Scale, Ruler, TrendingUp,
   Heart, Printer, ShieldCheck, User,
-  FileText, X, Pill
+  FileText, X, Pill, LayoutDashboard
 } from 'lucide-react';
 import { adminAPI } from '../services/api';
 import { database } from '../context/AuthContext';
@@ -67,14 +67,13 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
       }
 
       // If RFID exists, attach live realtime listeners for history & latest
-      if (rfid) {
+      if (rfid && rfid !== 'Not assigned') {
         // 1. Latest Reading Listener
         const latestRef = ref(database, `READINGS/${rfid}/latest`);
         onValue(latestRef, (snap) => {
           if (snap.exists()) {
             setLatestReading(snap.val());
           } else {
-            // Check global /READINGS/latest fallback
             get(ref(database, 'READINGS/latest')).then((gSnap) => {
               if (gSnap.exists()) setLatestReading(gSnap.val());
             }).catch(() => {});
@@ -110,7 +109,6 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
             }).sort((a, b) => a.timestamp - b.timestamp);
             setHistoryData(processed);
           } else {
-            // Try global history if RFID has no history
             get(ref(database, 'READINGS/history')).then((gHistSnap) => {
               if (gHistSnap.exists()) {
                 const histObj = gHistSnap.val();
@@ -144,14 +142,117 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
           }
         });
       } else {
-        // Fallback global check
         get(ref(database, 'READINGS/latest')).then(snap => {
           if (snap.exists()) setLatestReading(snap.val());
         }).catch(() => {});
       }
     } catch (err: any) {
-      console.error('Failed to load patient details:', err);
-      setError(err.response?.data?.error || 'Failed to load patient details');
+      console.warn('Backend getPatientDetails failed, falling back to direct Firebase RTDB:', err);
+      try {
+        let resolvedUid = uid;
+        let userSnap = await get(ref(database, `USERS/${uid}`));
+        let userData = userSnap.exists() ? userSnap.val() : null;
+
+        if (!userData) {
+          const rfidSnap = await get(ref(database, `RFID_MAPPING/${uid}`));
+          if (rfidSnap.exists()) {
+            resolvedUid = rfidSnap.val().userId;
+            userSnap = await get(ref(database, `USERS/${resolvedUid}`));
+            if (userSnap.exists()) userData = userSnap.val();
+          }
+        }
+
+        if (!userData) {
+          const allUsersSnap = await get(ref(database, 'USERS'));
+          if (allUsersSnap.exists()) {
+            const allUsers = allUsersSnap.val();
+            for (const [k, u] of Object.entries(allUsers)) {
+              const uObj: any = u;
+              if (k === uid || uObj?.profile?.rfidNumber === uid || uObj?.rfid === uid || uObj?.medicalId === uid || uObj?.profile?.medicalId === uid) {
+                resolvedUid = k;
+                userData = uObj;
+                break;
+              }
+            }
+          }
+        }
+
+        if (userData) {
+          const rawProfile = userData.profile || userData;
+          const rfid = rawProfile.rfidNumber || rawProfile.rfid || (uid.length <= 16 && /^[A-Fa-f0-9]+$/.test(uid) ? uid : '');
+          const profile = {
+            firstName: rawProfile.firstName || rawProfile.first_name || (rawProfile.name ? rawProfile.name.split(' ')[0] : 'Patient'),
+            lastName: rawProfile.lastName || rawProfile.last_name || (rawProfile.name ? rawProfile.name.split(' ').slice(1).join(' ') : 'Record'),
+            email: rawProfile.email || '',
+            phone: rawProfile.phone || '',
+            gender: rawProfile.gender || 'Not specified',
+            dateOfBirth: rawProfile.dateOfBirth || '',
+            bloodType: rawProfile.bloodType || '',
+            medicalId: rawProfile.medicalId || rawProfile.medical_id || ('MB-' + resolvedUid.slice(0, 6).toUpperCase()),
+            rfidNumber: rfid || 'Not assigned',
+            biometric_enrolled: Boolean(userData.biometric_enrolled || rawProfile.biometric_enrolled || userData.fingerprint_registered || rawProfile.fingerprint_registered),
+            fingerprint_registered: Boolean(userData.fingerprint_registered || rawProfile.fingerprint_registered),
+            createdAt: rawProfile.createdAt || rawProfile.linkedAt || Date.now()
+          };
+
+          const medsSnap = await get(ref(database, `USERS/${resolvedUid}/medications`));
+          const medications = medsSnap.exists() ? medsSnap.val() : {};
+
+          let latest = null;
+          if (rfid && rfid !== 'Not assigned') {
+            const lSnap = await get(ref(database, `READINGS/${rfid}/latest`));
+            if (lSnap.exists()) latest = lSnap.val();
+          }
+          if (!latest) {
+            const gSnap = await get(ref(database, 'READINGS/latest'));
+            if (gSnap.exists()) latest = gSnap.val();
+          }
+
+          setPatient({ profile, medications, latestReading: latest });
+          if (latest) setLatestReading(latest);
+          setError(null);
+
+          // Realtime history listener
+          const histTarget = (rfid && rfid !== 'Not assigned') ? rfid : null;
+          if (histTarget) {
+            const histRef = ref(database, `READINGS/${histTarget}/history`);
+            onValue(histRef, (snap) => {
+              if (snap.exists()) {
+                const histObj = snap.val();
+                const processed = Object.entries(histObj).map(([key, rawItem]: [string, any]) => {
+                  const item = rawItem || {};
+                  const rawTs = parseInt(key) || parseInt(item.timestamp) || Date.now();
+                  const ts = rawTs > 1e11 ? rawTs : rawTs * 1000;
+                  const d = new Date(ts);
+                  return {
+                    date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                    time: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    fullDate: d.toLocaleString(),
+                    timestamp: ts,
+                    heartRate: item.heartRate || item.heart_rate || 0,
+                    spo2: item.spo2 || 0,
+                    systolic: item.systolic || 0,
+                    diastolic: item.diastolic || 0,
+                    temperature: item.temperature || 0,
+                    weight: item.weight || 0,
+                    bmiLaser: item.bmiLaser ?? item.bmi_laser ?? item.bmi ?? 0,
+                    bmiSonar: item.bmiSonar ?? item.bmi_sonar ?? 0,
+                    heightLaser: item.heightLaser ?? item.height_laser ?? item.height ?? 0,
+                    heightSonar: item.heightSonar ?? item.height_sonar ?? 0,
+                  };
+                }).sort((a, b) => a.timestamp - b.timestamp);
+                setHistoryData(processed);
+              }
+            });
+          }
+          return;
+        }
+
+        setError('Patient record not found in system.');
+      } catch (fbErr: any) {
+        console.error('Firebase fallback error:', fbErr);
+        setError(fbErr.message || 'Failed to load patient details');
+      }
     } finally {
       setLoading(false);
     }
@@ -159,6 +260,10 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
 
   useEffect(() => {
     fetchPatientDetails();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('report') === 'open' || params.get('report') === 'true') {
+      setShowReportModal(true);
+    }
   }, [fetchPatientDetails]);
 
   const handlePrint = () => {
@@ -211,7 +316,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
       display: 'flex', alignItems: 'center', justifyContent: 'center', 
       color: '#fff', fontSize: '32px', fontWeight: '800', flexShrink: 0 
     },
-    grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '20px' },
+    grid: { display: 'flex', flexDirection: 'column' as const, gap: '24px', width: '100%' },
     chartCard: { backgroundColor: '#fff', padding: '20px', borderRadius: '14px', border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' },
     title: { fontSize: '26px', fontWeight: '800', color: '#0f172a', margin: 0 },
     subTitle: { fontSize: '16px', fontWeight: '700', color: '#1e293b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' },
@@ -309,6 +414,26 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
           <button onClick={() => setShowReportModal(true)} style={{ padding: '10px 20px', backgroundColor: '#0284c7', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '700', fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 2px 4px rgba(2,132,199,0.3)' }}>
             <FileText size={18} /> Official Medical Report
           </button>
+        </div>
+      </div>
+
+      {/* DASHBOARD TITLE BANNER */}
+      <div style={{ marginBottom: '20px' }} className="no-print">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+          <span>Clinical Patient Management</span>
+          <span>&gt;</span>
+          <span style={{ color: '#0284c7', fontWeight: '700' }}>Patient Clinical Dashboard</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <LayoutDashboard size={24} color="#0284c7" />
+              Patient Clinical Dashboard & Telemetry
+            </h1>
+            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+              Full continuous physiological monitoring, WHO/AHA risk stratification, and longitudinal health records
+            </p>
+          </div>
         </div>
       </div>
 
@@ -510,10 +635,10 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
         </div>
       </div>
 
-      {/* CHARTS GRID */}
+      {/* CHARTS GRID — EXTENDING ACROSS THE SCREEN */}
       <div style={styles.grid} className="no-print">
         {/* BMI COMPARISON */}
-        <div style={styles.chartCard}>
+        <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={styles.subTitle}><TrendingUp size={20} color="#0284c7" /> Stature & Adiposity Progression</h3>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '6px' }}>
@@ -527,7 +652,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
               <p style={{ margin: '4px 0 0 0', fontSize: '12px' }}>Sessions from the kiosk will plot automatically.</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={340}>
               <ComposedChart data={historyData}>
                 <defs>
                   <linearGradient id="pdpLaserBmiGrad" x1="0" y1="0" x2="0" y2="1">
@@ -553,7 +678,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
         </div>
 
         {/* BLOOD PRESSURE */}
-        <div style={styles.chartCard}>
+        <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={styles.subTitle}><Activity size={20} color="#dc2626" /> Blood Pressure Progression</h3>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#991b1b', backgroundColor: '#fee2e2', padding: '3px 8px', borderRadius: '6px' }}>
@@ -566,7 +691,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
               <p style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>No BP readings recorded yet</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={340}>
               <ComposedChart data={historyData}>
                 <defs>
                   <linearGradient id="pdpBpPulseGrad" x1="0" y1="0" x2="0" y2="1">
@@ -593,7 +718,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
         </div>
 
         {/* SPO2 */}
-        <div style={styles.chartCard}>
+        <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={styles.subTitle}><Droplets size={20} color="#0284c7" /> Pulse Oximetry (SpO2)</h3>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#0369a1', backgroundColor: '#e0f2fe', padding: '3px 8px', borderRadius: '6px' }}>
@@ -606,7 +731,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
               <p style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>No SpO2 readings recorded yet</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={340}>
               <AreaChart data={historyData}>
                 <defs>
                   <linearGradient id="pdpSpo2Grad" x1="0" y1="0" x2="0" y2="1">
@@ -628,7 +753,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
         </div>
 
         {/* HEIGHT SENSORS */}
-        <div style={styles.chartCard}>
+        <div style={{ ...styles.chartCard, width: '100%', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={styles.subTitle}><Ruler size={20} color="#16a34a" /> Stature Sensing (Meters)</h3>
             <span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', backgroundColor: '#dcfce7', padding: '3px 8px', borderRadius: '6px' }}>
@@ -641,7 +766,7 @@ const PatientDetailPage: React.FC<PatientDetailPageProps> = ({ onBack }) => {
               <p style={{ margin: 0, fontSize: '14px', fontWeight: '500' }}>No height telemetry yet</p>
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={340}>
               <LineChart data={historyData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="date" tick={{fontSize: 10}} stroke="#64748b" />
