@@ -5,7 +5,7 @@ import { ref, get } from 'firebase/database';
 import { readingsAPI } from '../services/api';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-  ResponsiveContainer, AreaChart, Area, ReferenceLine, ComposedChart 
+  ResponsiveContainer, AreaChart, Area, ReferenceLine, ComposedChart, ReferenceArea 
 } from 'recharts';
 import { formatFloat } from '../utils/format';
 
@@ -131,13 +131,19 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div style={{ backgroundColor: '#fff', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
-          <p style={{ fontWeight: 'bold', marginBottom: '8px', color: '#1f2937' }}>{payload[0].payload.fullDate}</p>
-          {payload.map((item: any, index: number) => (
-            <p key={index} style={{ color: item.color, fontSize: '14px', margin: '4px 0' }}>
-              {item.name}: <span style={{ fontWeight: '600' }}>{typeof item.value === 'number' ? formatFloat(item.value, 4) : item.value}</span>
-            </p>
-          ))}
+        <div style={{ backgroundColor: '#fff', padding: '12px 14px', border: '1px solid #cbd5e1', borderRadius: '10px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+          <p style={{ fontWeight: '800', marginBottom: '8px', color: '#0f172a', fontSize: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
+            {payload[0].payload.fullDate || label}
+          </p>
+          {payload.map((item: any, index: number) => {
+            if (item.name === 'Pulse Pressure Span' || item.name === 'BMI Trend Area') return null;
+            return (
+              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', fontSize: '12px', margin: '3px 0' }}>
+                <span style={{ color: item.color, fontWeight: '600' }}>{item.name}:</span>
+                <span style={{ fontWeight: '800', color: '#0f172a' }}>{typeof item.value === 'number' ? formatFloat(item.value, 4) : item.value}</span>
+              </div>
+            );
+          })}
         </div>
       );
     }
@@ -184,22 +190,32 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
-                <h3 style={styles.cardTitle}>BMI Analysis</h3>
-                <p style={styles.cardSub}>Comparison between Laser and Sonar precision</p>
+                <h3 style={styles.cardTitle}>BMI & Adiposity Analysis</h3>
+                <p style={styles.cardSub}>Body mass index progression with WHO clinical zone overlays</p>
               </div>
-              <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Ideal: 18.5 - 25</div>
+              <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>WHO Normal: 18.5 - 24.9</div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={historyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                <defs>
+                  <linearGradient id="anBmiArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
+                <YAxis domain={[15, 36]} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <ReferenceLine y={25} label="Overweight" stroke="#f59e0b" strokeDasharray="3 3" />
-                <ReferenceLine y={18.5} label="Underweight" stroke="#3b82f6" strokeDasharray="3 3" />
-                <Line name="BMI (Laser)" type="monotone" dataKey="bmiLaser" stroke="#2563eb" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
-                <Line name="BMI (Sonar)" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" />
+                <ReferenceArea y1={18.5} y2={24.9} fill="#dcfce7" fillOpacity={0.4} />
+                <ReferenceArea y1={25} y2={29.9} fill="#fef3c7" fillOpacity={0.3} />
+                <ReferenceArea y1={30} y2={36} fill="#fee2e2" fillOpacity={0.3} />
+                <ReferenceLine y={25} label={{ value: 'Overweight (25)', fill: '#d97706', fontSize: 10, position: 'right' }} stroke="#f59e0b" strokeDasharray="3 3" />
+                <ReferenceLine y={18.5} label={{ value: 'Underweight (18.5)', fill: '#2563eb', fontSize: 10, position: 'right' }} stroke="#3b82f6" strokeDasharray="3 3" />
+                <Area name="BMI Trend Area" type="monotone" dataKey="bmiLaser" fill="url(#anBmiArea)" stroke="none" />
+                <Line name="BMI (Optical Stature)" type="monotone" dataKey="bmiLaser" stroke="#2563eb" strokeWidth={3} dot={{r: 4, fill: '#2563eb'}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                <Line name="BMI (Acoustic Stature)" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="4 4" dot={{r: 3}} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -208,24 +224,33 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
-                <h3 style={styles.cardTitle}>Blood Pressure</h3>
-                <p style={styles.cardSub}>Systolic and Diastolic pressure trends</p>
+                <h3 style={styles.cardTitle}>Hemodynamic Blood Pressure</h3>
+                <p style={styles.cardSub}>Systolic, Diastolic & arterial pulse pressure span</p>
               </div>
-              <div style={{ ...styles.thresholdLabel, backgroundColor: '#fee2e2', color: '#991b1b' }}>Ideal: 120/80</div>
+              <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &lt; 120/80 mmHg</div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={historyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+              <ComposedChart data={historyData}>
+                <defs>
+                  <linearGradient id="anBpPulseGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#dc2626" stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
+                <YAxis domain={[50, 190]} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <ReferenceLine y={140} label="High Sys" stroke="#ef4444" strokeDasharray="3 3" />
-                <ReferenceLine y={90} label="Low Sys" stroke="#3b82f6" strokeDasharray="3 3" />
-                <ReferenceLine y={60} label="Low Dia" stroke="#60a5fa" strokeDasharray="3 3" />
-                <Line name="Systolic" type="stepAfter" dataKey="systolic" stroke="#dc2626" strokeWidth={3} />
-                <Line name="Diastolic" type="stepAfter" dataKey="diastolic" stroke="#ef4444" strokeWidth={2} />
-              </LineChart>
+                <ReferenceArea y1={60} y2={120} fill="#dcfce7" fillOpacity={0.25} />
+                <ReferenceArea y1={140} y2={190} fill="#fee2e2" fillOpacity={0.2} />
+                <ReferenceLine y={140} label={{ value: 'Stage 2 HTN (140)', fill: '#dc2626', fontSize: 10, position: 'right' }} stroke="#dc2626" strokeDasharray="3 3" />
+                <ReferenceLine y={120} label={{ value: 'Elevated (120)', fill: '#d97706', fontSize: 10, position: 'right' }} stroke="#d97706" strokeDasharray="3 3" />
+                <ReferenceLine y={90} label={{ value: 'Diastolic Limit (90)', fill: '#2563eb', fontSize: 10, position: 'right' }} stroke="#2563eb" strokeDasharray="3 3" />
+                <Area name="Pulse Pressure Span" type="monotone" dataKey="systolic" stroke="none" fill="url(#anBpPulseGrad)" />
+                <Line name="Systolic (mmHg)" type="monotone" dataKey="systolic" stroke="#dc2626" strokeWidth={3} dot={{r: 4, fill: '#dc2626'}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                <Line name="Diastolic (mmHg)" type="monotone" dataKey="diastolic" stroke="#2563eb" strokeWidth={3} dot={{r: 4, fill: '#2563eb'}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
 
@@ -234,24 +259,25 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
             <div style={styles.cardHeader}>
               <div>
                 <h3 style={styles.cardTitle}>Oxygen Saturation (SpO2)</h3>
-                <p style={styles.cardSub}>Percentage of oxygen in blood</p>
+                <p style={styles.cardSub}>Dynamic blood oxygen waveform with hypoxia safety boundary</p>
               </div>
-              <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: {">"} 95%</div>
+              <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &gt; 95%</div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <AreaChart data={historyData}>
                 <defs>
-                  <linearGradient id="colorSpo2" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0}/>
+                  <linearGradient id="anColorSpo2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35}/>
+                    <stop offset="95%" stopColor="#0284c7" stopOpacity={0.02}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis domain={[80, 100]} axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
+                <YAxis domain={[80, 100]} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={95} label="Alert" stroke="#ef4444" strokeWidth={2} />
-                <Area name="SpO2 %" type="monotone" dataKey="spo2" stroke="#0891b2" strokeWidth={3} fillOpacity={1} fill="url(#colorSpo2)" />
+                <ReferenceArea y1={80} y2={95} fill="#fee2e2" fillOpacity={0.3} />
+                <ReferenceLine y={95} label={{ value: 'Hypoxia Risk (<95%)', fill: '#dc2626', fontSize: 10, position: 'right' }} stroke="#ef4444" strokeWidth={2} strokeDasharray="3 3" />
+                <Area name="SpO2 Saturation (%)" type="monotone" dataKey="spo2" stroke="#0284c7" strokeWidth={3} fillOpacity={1} fill="url(#anColorSpo2)" dot={{r: 4, fill: '#0284c7'}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -260,20 +286,20 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
           <div style={styles.card}>
             <div style={styles.cardHeader}>
               <div>
-                <h3 style={styles.cardTitle}>Height Measurement</h3>
-                <p style={styles.cardSub}>Precision comparison of sensing technologies</p>
+                <h3 style={styles.cardTitle}>Stature Measurement (Meters)</h3>
+                <p style={styles.cardSub}>Dual clinical stadiometer precision tracking</p>
               </div>
               <div style={{ ...styles.thresholdLabel, backgroundColor: '#f3f4f6', color: '#374151' }}>Unit: Meters</div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={historyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis domain={['dataMin - 0.1', 'dataMax + 0.1']} axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
+                <YAxis domain={['dataMin - 0.05', 'dataMax + 0.05']} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Line name="Height (Laser)" type="monotone" dataKey="heightLaser" stroke="#10b981" strokeWidth={3} />
-                <Line name="Height (Sonar)" type="monotone" dataKey="heightSonar" stroke="#6366f1" strokeWidth={2} strokeDasharray="3 3" />
+                <Line name="Optical Stadiometer (m)" type="monotone" dataKey="heightLaser" stroke="#16a34a" strokeWidth={3} dot={{r: 4, fill: '#16a34a'}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                <Line name="Acoustic Stadiometer (m)" type="monotone" dataKey="heightSonar" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="4 4" dot={{r: 3}} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -286,19 +312,19 @@ const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onBack }) => {
                 <p style={styles.cardSub}>Physical health metrics over time</p>
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Temp: 36-37°C</div>
+                <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Temp: 36.1 - 37.2°C</div>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={historyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis yAxisId="left" orientation="left" stroke="#6366f1" axisLine={false} tickLine={false} />
-                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 11}} />
+                <YAxis yAxisId="left" orientation="left" stroke="#6366f1" axisLine={false} tickLine={false} tick={{fill: '#6366f1', fontSize: 11}} />
+                <YAxis yAxisId="right" orientation="right" stroke="#f59e0b" axisLine={false} tickLine={false} tick={{fill: '#f59e0b', fontSize: 11}} />
                 <Tooltip content={<CustomTooltip />} />
                 <Legend />
-                <Line yAxisId="left" name="Weight (kg)" type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={3} />
-                <Line yAxisId="right" name="Temp (°C)" type="monotone" dataKey="temperature" stroke="#f59e0b" strokeWidth={3} />
+                <Line yAxisId="left" name="Weight (kg)" type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={3} dot={{r: 4, fill: '#6366f1'}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                <Line yAxisId="right" name="Temp (°C)" type="monotone" dataKey="temperature" stroke="#f59e0b" strokeWidth={3} dot={{r: 4, fill: '#f59e0b'}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
               </LineChart>
             </ResponsiveContainer>
           </div>

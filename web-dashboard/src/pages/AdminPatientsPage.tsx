@@ -271,7 +271,7 @@ const AdminPatientsPage: React.FC<AdminPatientsPageProps> = ({ onBack }) => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Name', 'Medical Record ID', 'Email', 'RFID', 'Biometrics', 'Latest BP', 'Heart Rate', 'SpO2', 'Laser BMI', 'Sonar BMI', 'Date of Birth', 'Gender', 'Phone', 'Registered'];
+    const headers = ['Name', 'Medical Record ID', 'Email', 'RFID', 'Biometrics', 'Latest BP', 'Heart Rate', 'SpO2', 'Optical BMI', 'Acoustic BMI', 'Date of Birth', 'Gender', 'Phone', 'Registered'];
     const rows = filteredPatients.map(p => {
       const reading = readingsMap[p.rfidNumber];
       const hasBio = biometricsMap[p.uid] || biometricsMap[p.rfidNumber];
@@ -465,8 +465,8 @@ const AdminPatientsPage: React.FC<AdminPatientsPageProps> = ({ onBack }) => {
                   <th style={styles.th}>Latest BP</th>
                   <th style={styles.th}>Heart Rate</th>
                   <th style={styles.th}>SpO2</th>
-                  <th style={styles.th}>Laser BMI</th>
-                  <th style={styles.th}>Sonar BMI</th>
+                  <th style={styles.th}>Optical BMI</th>
+                  <th style={styles.th}>Acoustic BMI</th>
                   <th style={styles.th}>Actions</th>
                 </tr>
               </thead>

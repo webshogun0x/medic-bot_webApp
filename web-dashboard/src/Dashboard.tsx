@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Legend, ReferenceLine 
+  PieChart, Pie, Cell, AreaChart, Area, ComposedChart, Legend, ReferenceLine, ReferenceArea 
 } from 'recharts';
 import { AuthContext, database, auth } from './context/AuthContext';
 import { ref, onValue, get } from 'firebase/database';
@@ -209,7 +209,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
       const activities = entries.slice(-5).reverse().map((reading, idx) => ({
         id: idx,
         name: `Kiosk Session #${total - idx}`,
-        type: `BP: ${reading.systolic}/${reading.diastolic} mmHg | SpO2: ${reading.spo2}% | Laser BMI: ${reading.bmiLaser || 'N/A'}`,
+        type: `BP: ${reading.systolic}/${reading.diastolic} mmHg | SpO2: ${reading.spo2}% | Optical BMI: ${reading.bmiLaser ? formatFloat(reading.bmiLaser, 4) : 'N/A'}`,
         time: `${reading.time} (${reading.date})`,
         avatar: 'K'
       }));
@@ -328,13 +328,19 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div style={{ backgroundColor: '#fff', padding: '12px', border: '1px solid #e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-          <p style={{ fontWeight: '700', marginBottom: '6px', color: '#0f172a', fontSize: '12px' }}>{payload[0].payload.fullDate || label}</p>
-          {payload.map((item: any, index: number) => (
-            <p key={index} style={{ color: item.color, fontSize: '12px', margin: '3px 0' }}>
-              {item.name}: <span style={{ fontWeight: '700' }}>{typeof item.value === 'number' ? formatFloat(item.value, 4) : item.value}</span>
-            </p>
-          ))}
+        <div style={{ backgroundColor: '#fff', padding: '12px 14px', border: '1px solid #cbd5e1', borderRadius: '10px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}>
+          <p style={{ fontWeight: '800', marginBottom: '8px', color: '#0f172a', fontSize: '12px', borderBottom: '1px solid #f1f5f9', paddingBottom: '4px' }}>
+            {payload[0].payload.fullDate || label}
+          </p>
+          {payload.map((item: any, index: number) => {
+            if (item.name === 'Pulse Pressure Span') return null;
+            return (
+              <div key={index} style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', fontSize: '12px', margin: '3px 0' }}>
+                <span style={{ color: item.color, fontWeight: '600' }}>{item.name}:</span>
+                <span style={{ fontWeight: '800', color: '#0f172a' }}>{typeof item.value === 'number' ? formatFloat(item.value, 4) : item.value}</span>
+              </div>
+            );
+          })}
         </div>
       );
     }
@@ -689,10 +695,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       </div>
                     </div>
 
-                    {/* LASER BMI */}
+                    {/* OPTICAL BMI */}
                     <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Laser BMI (Primary)</span>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Optical BMI (Primary)</span>
                         <TrendingUp size={16} color="#0284c7" />
                       </div>
                       <div style={{ fontSize: '22px', fontWeight: '800', color: '#0284c7' }}>
@@ -706,10 +712,10 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       </div>
                     </div>
 
-                    {/* SONAR BMI */}
+                    {/* ACOUSTIC BMI */}
                     <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Sonar BMI (Auxiliary)</span>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>Acoustic BMI (Verification)</span>
                         <TrendingUp size={16} color="#9333ea" />
                       </div>
                       <div style={{ fontSize: '22px', fontWeight: '800', color: '#9333ea' }}>
@@ -797,8 +803,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                   <div style={styles.chartCard}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                       <div>
-                        <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Dual-Sensor BMI Progression</h3>
-                        <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>Optical Laser vs Acoustic Sonar continuous stadiometer tracking</p>
+                        <h3 style={{ fontSize: '16px', fontWeight: '800', color: '#0f172a', margin: 0 }}>Stature & Adiposity Progression</h3>
+                        <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0 0' }}>Dual Optical vs Acoustic continuous stadiometer tracking</p>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Healthy WHO: 18.5 - 24.9</div>
@@ -811,22 +817,32 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         <Activity size={40} style={{ margin: '0 auto 10px', color: '#cbd5e1' }} />
                         <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#475569', marginBottom: '4px' }}>No BMI Telemetry Yet</h4>
                         <p style={{ fontSize: '12px', color: '#64748b', maxWidth: '360px', margin: '0 auto' }}>
-                          Step onto the MediBot kiosk and complete a physical session to track dual Laser vs Sonar BMI.
+                          Step onto the MediBot kiosk and complete a physical session to track continuous stature & BMI.
                         </p>
                       </div>
                     ) : (
-                      <ResponsiveContainer width="100%" height={280}>
-                        <LineChart data={chartData.length > 0 ? chartData : historyData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <ResponsiveContainer width="100%" height={290}>
+                        <ComposedChart data={chartData.length > 0 ? chartData : historyData}>
+                          <defs>
+                            <linearGradient id="dashLaserBmiGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#0284c7" stopOpacity={0.25} />
+                              <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                           <XAxis dataKey="date" stroke="#64748b" tick={{ fontSize: 11 }} />
-                          <YAxis stroke="#64748b" domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+                          <YAxis stroke="#64748b" domain={[15, 35]} tick={{ fontSize: 11 }} />
                           <Tooltip content={<CustomTooltip />} />
                           <Legend />
+                          {/* WHO Clinical Classification Shaded Zones */}
+                          <ReferenceArea y1={18.5} y2={24.9} fill="#dcfce7" fillOpacity={0.4} />
+                          <ReferenceArea y1={25} y2={29.9} fill="#fef3c7" fillOpacity={0.35} />
+                          <ReferenceArea y1={30} y2={35} fill="#fee2e2" fillOpacity={0.25} />
                           <ReferenceLine y={25} stroke="#d97706" strokeDasharray="3 3" label={{ value: 'Overweight (25)', fill: '#d97706', fontSize: 10 }} />
                           <ReferenceLine y={18.5} stroke="#0284c7" strokeDasharray="3 3" label={{ value: 'Underweight (18.5)', fill: '#0284c7', fontSize: 10 }} />
-                          <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                          <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
-                        </LineChart>
+                          <Area name="Optical BMI" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} fill="url(#dashLaserBmiGrad)" dot={{ r: 4 }} activeDot={{ r: 7, stroke: '#fff', strokeWidth: 2 }} />
+                          <Line name="Acoustic BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3 }} />
+                        </ComposedChart>
                       </ResponsiveContainer>
                     )}
                   </div>
@@ -896,7 +912,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                         • <strong>Oxygenation:</strong> {latestReading?.spo2 ? `${latestReading.spo2}% SpO2` : 'Awaiting sensor'} via PPG pulse oximetry.
                       </p>
                       <p style={{ margin: '0 0 10px 0' }}>
-                        • <strong>Stadiometer Correlation:</strong> Laser ({latestReading?.heightLaser ? formatFloat(latestReading.heightLaser, 4) : '--'} m) vs Sonar ({latestReading?.heightSonar ? formatFloat(latestReading.heightSonar, 4) : '--'} m).
+                        • <strong>Stadiometer Correlation:</strong> Optical ({latestReading?.heightLaser ? formatFloat(latestReading.heightLaser, 4) : '--'} m) vs Acoustic ({latestReading?.heightSonar ? formatFloat(latestReading.heightSonar, 4) : '--'} m).
                       </p>
                       <p style={{ margin: '0' }}>
                         • <strong>Biometric Binding:</strong> {isCurrentlyEnrolled ? 'RFID Card & Biometric Fingerprint Active.' : 'Pending kiosk fingerprint enrollment.'}
@@ -940,20 +956,29 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 {/* BMI COMPARISON */}
                 <div style={styles.chartCard}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>BMI Precision (Laser vs Sonar)</h3>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Stature & Adiposity Progression</h3>
                     <div style={{ ...styles.thresholdLabel, backgroundColor: '#fef3c7', color: '#92400e' }}>Healthy: 18.5 - 24.9</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={240}>
+                  <ResponsiveContainer width="100%" height={260}>
                     <ComposedChart data={historyData}>
+                      <defs>
+                        <linearGradient id="repLaserBmiGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0284c7" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="#0284c7" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{fontSize: 11}} />
-                      <YAxis domain={[15, 35]} tick={{fontSize: 11}} />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} stroke="#64748b" />
+                      <YAxis domain={[15, 35]} tick={{fontSize: 11}} stroke="#64748b" />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <ReferenceLine y={25} stroke="#d97706" strokeDasharray="3 3" />
-                      <ReferenceLine y={18.5} stroke="#0284c7" strokeDasharray="3 3" />
-                      <Line name="Laser BMI" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} dot={{r: 4}} />
-                      <Line name="Sonar BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                      <ReferenceArea y1={18.5} y2={24.9} fill="#dcfce7" fillOpacity={0.4} />
+                      <ReferenceArea y1={25} y2={29.9} fill="#fef3c7" fillOpacity={0.35} />
+                      <ReferenceArea y1={30} y2={35} fill="#fee2e2" fillOpacity={0.25} />
+                      <ReferenceLine y={25} stroke="#d97706" strokeDasharray="3 3" label={{ value: 'Overweight (25)', fill: '#d97706', fontSize: 10 }} />
+                      <ReferenceLine y={18.5} stroke="#0284c7" strokeDasharray="3 3" label={{ value: 'Underweight (18.5)', fill: '#0284c7', fontSize: 10 }} />
+                      <Area name="Optical BMI" type="monotone" dataKey="bmiLaser" stroke="#0284c7" strokeWidth={3} fill="url(#repLaserBmiGrad)" dot={{r: 4}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                      <Line name="Acoustic BMI" type="monotone" dataKey="bmiSonar" stroke="#9333ea" strokeWidth={2} strokeDasharray="5 5" dot={{r: 3}} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -964,18 +989,28 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Blood Pressure Progression</h3>
                     <div style={{ ...styles.thresholdLabel, backgroundColor: '#fee2e2', color: '#991b1b' }}>Ideal: &lt; 120/80</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={240}>
-                    <LineChart data={historyData}>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <ComposedChart data={historyData}>
+                      <defs>
+                        <linearGradient id="repBpPulseGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#dc2626" stopOpacity={0.2} />
+                          <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{fontSize: 11}} />
-                      <YAxis domain={[50, 180]} tick={{fontSize: 11}} />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} stroke="#64748b" />
+                      <YAxis domain={[50, 190]} tick={{fontSize: 11}} stroke="#64748b" />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <ReferenceLine y={140} stroke="#dc2626" strokeDasharray="3 3" />
-                      <ReferenceLine y={90} stroke="#0284c7" strokeDasharray="3 3" />
-                      <Line name="Systolic" type="monotone" dataKey="systolic" stroke="#dc2626" strokeWidth={2} dot={{r: 3}} />
-                      <Line name="Diastolic" type="monotone" dataKey="diastolic" stroke="#f87171" strokeWidth={2} dot={{r: 3}} />
-                    </LineChart>
+                      <ReferenceArea y1={60} y2={120} fill="#dcfce7" fillOpacity={0.25} />
+                      <ReferenceArea y1={140} y2={190} fill="#fee2e2" fillOpacity={0.2} />
+                      <ReferenceLine y={140} stroke="#dc2626" strokeDasharray="3 3" label={{ value: 'Stage 2 HTN (140)', fill: '#dc2626', fontSize: 10 }} />
+                      <ReferenceLine y={120} stroke="#d97706" strokeDasharray="3 3" label={{ value: 'Elevated (120)', fill: '#d97706', fontSize: 10 }} />
+                      <ReferenceLine y={90} stroke="#2563eb" strokeDasharray="3 3" label={{ value: 'Diastolic (90)', fill: '#2563eb', fontSize: 10 }} />
+                      <Area name="Pulse Pressure Span" type="monotone" dataKey="systolic" stroke="none" fill="url(#repBpPulseGrad)" />
+                      <Line name="Systolic (mmHg)" type="monotone" dataKey="systolic" stroke="#dc2626" strokeWidth={3} dot={{r: 4}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                      <Line name="Diastolic (mmHg)" type="monotone" dataKey="diastolic" stroke="#2563eb" strokeWidth={3} dot={{r: 4}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
 
@@ -985,14 +1020,22 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Oxygen Saturation (SpO2 %)</h3>
                     <div style={{ ...styles.thresholdLabel, backgroundColor: '#dcfce7', color: '#166534' }}>Normal: &ge; 95%</div>
                   </div>
-                  <ResponsiveContainer width="100%" height={240}>
+                  <ResponsiveContainer width="100%" height={260}>
                     <AreaChart data={historyData}>
+                      <defs>
+                        <linearGradient id="repSpo2Grad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.35} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{fontSize: 11}} />
-                      <YAxis domain={[90, 100]} tick={{fontSize: 11}} />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} stroke="#64748b" />
+                      <YAxis domain={[88, 100]} tick={{fontSize: 11}} stroke="#64748b" />
                       <Tooltip content={<CustomTooltip />} />
-                      <ReferenceLine y={95} stroke="#dc2626" strokeWidth={2} />
-                      <Area name="SpO2 %" type="monotone" dataKey="spo2" stroke="#0284c7" fill="#e0f2fe" strokeWidth={2} />
+                      <ReferenceArea y1={88} y2={95} fill="#fee2e2" fillOpacity={0.4} />
+                      <ReferenceArea y1={95} y2={100} fill="#ecfdf5" fillOpacity={0.25} />
+                      <ReferenceLine y={95} stroke="#dc2626" strokeWidth={2} strokeDasharray="3 3" label={{ value: 'Hypoxia Threshold (95%)', fill: '#dc2626', fontSize: 10 }} />
+                      <Area name="SpO2 %" type="monotone" dataKey="spo2" stroke="#0891b2" fill="url(#repSpo2Grad)" strokeWidth={3} dot={{r: 3}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -1003,15 +1046,15 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#0f172a' }}>Height Sensing Comparison</h3>
                     <span style={{ fontSize: '12px', color: '#64748b' }}>Meters (m)</span>
                   </div>
-                  <ResponsiveContainer width="100%" height={240}>
+                  <ResponsiveContainer width="100%" height={260}>
                     <LineChart data={historyData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="date" tick={{fontSize: 11}} />
-                      <YAxis domain={['dataMin - 0.05', 'dataMax + 0.05']} tick={{fontSize: 11}} />
+                      <XAxis dataKey="date" tick={{fontSize: 11}} stroke="#64748b" />
+                      <YAxis domain={['dataMin - 0.05', 'dataMax + 0.05']} tick={{fontSize: 11}} stroke="#64748b" />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                      <Line name="Laser (m)" type="monotone" dataKey="heightLaser" stroke="#16a34a" strokeWidth={3} dot={{r: 3}} />
-                      <Line name="Sonar (m)" type="monotone" dataKey="heightSonar" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="4 4" dot={{r: 3}} />
+                      <Line name="Optical Stadiometer (m)" type="monotone" dataKey="heightLaser" stroke="#16a34a" strokeWidth={3} dot={{r: 4}} activeDot={{r: 7, stroke: '#fff', strokeWidth: 2}} />
+                      <Line name="Acoustic Stadiometer (m)" type="monotone" dataKey="heightSonar" stroke="#8b5cf6" strokeWidth={2} strokeDasharray="4 4" dot={{r: 3}} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -1041,8 +1084,8 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                     <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Blood Pressure</th>
                     <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Heart Rate</th>
                     <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>SpO2</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Laser BMI</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Sonar BMI</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Optical BMI</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Acoustic BMI</th>
                     <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Height</th>
                     <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Weight</th>
                     <th style={{ padding: '10px 12px', textAlign: 'left', color: '#475569', fontSize: '12px', fontWeight: '700' }}>Temp</th>
@@ -1120,7 +1163,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
             </div>
             <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '10px', borderLeft: '4px solid #0284c7' }}>
               <div style={{ fontSize: '13px', color: '#475569', lineHeight: '1.6' }}>
-                <strong>Diagnostic Basis:</strong> Our AI engine evaluates blood pressure progression (AHA stages), oxygenation saturation via Photoplethysmography (PPG), and dual-sensor stature & BMI (Optical Laser vs Acoustic Sonar) to generate actionable lifestyle and physician consultation guidance.
+                <strong>Diagnostic Basis:</strong> Our AI engine evaluates blood pressure progression (AHA stages), oxygenation saturation via Photoplethysmography (PPG), and dual-sensor stature & BMI (Optical vs Acoustic stadiometers) to generate actionable lifestyle and physician consultation guidance.
               </div>
             </div>
           </div>
@@ -1271,15 +1314,15 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                       </td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Laser)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>Optical Time-of-Flight Laser Stadiometer</td>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Optical)</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Precision Optical Stadiometer</td>
                       <td style={{ padding: '8px', fontWeight: '700' }}>{bmiLaserVal ? `${formatFloat(bmiLaserVal, 4)} kg/m²` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
                       <td style={{ padding: '8px', color: bmiCategory.color, fontWeight: '700' }}>{bmiCategory.label}</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                      <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Sonar)</td>
-                      <td style={{ padding: '8px', color: '#64748b' }}>Acoustic Ultrasonic Stadiometer</td>
+                      <td style={{ padding: '8px', fontWeight: '600' }}>Body Mass Index (Acoustic)</td>
+                      <td style={{ padding: '8px', color: '#64748b' }}>Precision Acoustic Stadiometer</td>
                       <td style={{ padding: '8px', fontWeight: '700' }}>{bmiSonarVal ? `${formatFloat(bmiSonarVal, 4)} kg/m²` : 'N/A'}</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>18.5 - 24.9</td>
                       <td style={{ padding: '8px', color: '#64748b' }}>Auxiliary Correlation</td>
@@ -1310,7 +1353,7 @@ const Dashboard = ({ onNavigate }: DashboardProps) => {
                 <div style={{ fontSize: '13px', lineHeight: '1.6', color: '#334155' }}>
                   • Blood Pressure demonstrates <strong>{bpCategory.label}</strong> ({latestReading?.systolic || '--'}/{latestReading?.diastolic || '--'} mmHg) per AHA guidelines.<br />
                   • Oxygenation index is verified at <strong>{latestReading?.spo2 || '--'}%</strong> via continuous photoplethysmography.<br />
-                  • Dual stadiometer sensor agreement (Laser ToF: {latestReading?.heightLaser ? formatFloat(latestReading.heightLaser, 4) : '--'}m vs Sonar: {latestReading?.heightSonar ? formatFloat(latestReading.heightSonar, 4) : '--'}m) indicates reliable stature acquisition.<br />
+                  • Dual stadiometer sensor agreement (Optical: {latestReading?.heightLaser ? formatFloat(latestReading.heightLaser, 4) : '--'}m vs Acoustic: {latestReading?.heightSonar ? formatFloat(latestReading.heightSonar, 4) : '--'}m) indicates reliable stature acquisition.<br />
                   • Patient baseline BMI classified as <strong>{bmiCategory.label}</strong> ({bmiLaserVal ? formatFloat(bmiLaserVal, 4) : (bmiSonarVal ? formatFloat(bmiSonarVal, 4) : '--')} kg/m²).
                 </div>
               </div>
